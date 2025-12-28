@@ -114,10 +114,12 @@ exportBtn.addEventListener('click', () => {
   toast('CSV exported');
 });
 
+const BASE_PATH = '/codex/';
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    const swUrl = new URL('service-worker.js', window.location.href);
-    navigator.serviceWorker.register(swUrl).catch(() => {});
+    const swUrl = new URL('service-worker.js', new URL(BASE_PATH, window.location.origin));
+    navigator.serviceWorker.register(swUrl, { scope: BASE_PATH }).catch(() => {});
   });
 }
 

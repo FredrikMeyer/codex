@@ -1,7 +1,8 @@
 {
   "name": "Asthma Medicine Tracker",
   "short_name": "Asthma Tracker",
-  "start_url": ".",
+  "start_url": "/codex/",
+  "scope": "/codex/",
   "display": "standalone",
   "background_color": "#0b172a",
   "theme_color": "#2563eb",
