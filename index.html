@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <title>Asthma Medicine Tracker</title>
+</head>
+<body>
+  <header>
+    <div class="header-title">Asthma Medicine Tracker</div>
+    <div class="subtitle">Log your daily usage anywhere.</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="field">
+        <label for="usage-date">Date</label>
+        <input type="date" id="usage-date" required>
+      </div>
+
+      <div class="field">
+        <label>Counter</label>
+        <div class="counter" aria-live="polite">
+          <button id="decrement" aria-label="Decrease usage">−</button>
+          <div class="count" id="count">0</div>
+          <button id="increment" aria-label="Increase usage">+</button>
+        </div>
+        <p class="hint">Track how many doses you used for the selected day.</p>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="save">Save count</button>
+        <button class="ghost" id="reset-day">Reset day</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <div class="label">History</div>
+          <div class="subtitle">Stored on this device for offline access.</div>
+        </div>
+        <button id="export">Export CSV</button>
+      </div>
+      <div id="entries" class="entries" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

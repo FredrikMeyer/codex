@@ -1,0 +1,9 @@
+{
+  "name": "Asthma Medicine Tracker",
+  "short_name": "Asthma Tracker",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b172a",
+  "theme_color": "#2563eb",
+  "icons": []
+}
