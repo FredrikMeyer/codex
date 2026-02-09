@@ -8,7 +8,7 @@ Then remove the skip marker.
 
 import pytest
 
-pytest.skip("Browser tests not yet implemented", allow_module_level=True)
+pytestmark = pytest.mark.skip(reason="Browser tests not yet implemented")
 
 
 def test_frontend_loads_in_browser(page, server_url):

@@ -129,7 +129,8 @@ def test_token_generation_updates_timestamp(client):
     code_entry = next(entry for entry in saved_data["codes"] if entry["code"] == code)
 
     assert "token_generated_at" in code_entry
-    assert code_entry["token_generated_at"].endswith("Z")  # ISO format with Z
+    # ISO format with timezone offset
+    assert code_entry["token_generated_at"].endswith("+00:00") or code_entry["token_generated_at"].endswith("Z")
 
 
 def test_existing_endpoints_still_work(client):
@@ -148,6 +149,6 @@ def test_existing_endpoints_still_work(client):
     # Save log with code (existing endpoint)
     log_response = test_client.post(
         "/logs",
-        json={"code": code, "log": {"date": "2026-02-09", "count": 1}}
+        json={"code": code, "log": {"date": "2026-02-09", "spray": 1}}
     )
     assert log_response.status_code == 200

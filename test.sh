@@ -16,8 +16,9 @@ show_help() {
     echo "Usage: ./test.sh [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  (no args)     Run all backend tests with coverage"
+    echo "  (no args)     Run all backend tests with coverage + type checking"
     echo "  --fast        Run tests without coverage (faster)"
+    echo "  --typecheck   Run only type checking with ty"
     echo "  --e2e         Run only backend E2E tests"
     echo "  --frontend    Run only frontend E2E tests (Playwright)"
     echo "  --unit        Run only unit tests (exclude E2E)"
@@ -25,8 +26,9 @@ show_help() {
     echo "  --help        Show this help message"
     echo ""
     echo "Examples:"
-    echo "  ./test.sh                 # All tests with coverage"
+    echo "  ./test.sh                 # All tests with coverage + type checking"
     echo "  ./test.sh --fast          # Quick test run"
+    echo "  ./test.sh --typecheck     # Just type checking"
     echo "  ./test.sh --e2e           # Just E2E tests"
     echo "  ./test.sh tests/test_app.py  # Specific test file"
 }
@@ -48,6 +50,21 @@ case "$1" in
         echo -e "${YELLOW}⚡ Fast mode: running tests without coverage${NC}"
         echo ""
         uv run pytest -v
+        ;;
+    --typecheck)
+        echo -e "${YELLOW}🔍 Running type checking with ty${NC}"
+        echo ""
+        uv run ty check app tests
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}✓ Type checking passed!${NC}"
+        else
+            echo ""
+            echo -e "${RED}✗ Type checking failed${NC}"
+            exit $EXIT_CODE
+        fi
         ;;
     --e2e)
         echo -e "${YELLOW}🌐 Running backend E2E tests only${NC}"
@@ -75,20 +92,35 @@ case "$1" in
         uv run pytest-watch
         ;;
     "")
+        echo -e "${YELLOW}🔍 Running type checking with ty${NC}"
+        echo ""
+        uv run ty check app tests
+        TYPE_EXIT_CODE=$?
+
+        if [ $TYPE_EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}✓ Type checking passed!${NC}"
+        else
+            echo ""
+            echo -e "${RED}✗ Type checking failed${NC}"
+            exit $TYPE_EXIT_CODE
+        fi
+
+        echo ""
         echo -e "${YELLOW}🧪 Running all tests with coverage${NC}"
         echo ""
         uv run pytest --cov=app --cov-report=term-missing --cov-report=html -v
 
-        EXIT_CODE=$?
+        TEST_EXIT_CODE=$?
 
-        if [ $EXIT_CODE -eq 0 ]; then
+        if [ $TEST_EXIT_CODE -eq 0 ]; then
             echo ""
             echo -e "${GREEN}✓ All tests passed!${NC}"
             echo -e "${BLUE}📊 HTML coverage report: backend/htmlcov/index.html${NC}"
         else
             echo ""
             echo -e "${RED}✗ Tests failed${NC}"
-            exit $EXIT_CODE
+            exit $TEST_EXIT_CODE
         fi
         ;;
     *)

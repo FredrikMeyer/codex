@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -44,7 +43,7 @@ def test_login_accepts_valid_code_and_rejects_invalid(client):
 def test_logs_endpoint_requires_known_code_and_persists_log(client):
     test_client, data_file = client
     generated = test_client.post("/generate-code").get_json()["code"]
-    payload = {"code": generated, "log": {"date": "2024-01-01", "count": 3}}
+    payload = {"code": generated, "log": {"date": "2024-01-01", "spray": 3}}
 
     ok_response = test_client.post("/logs", json=payload)
     assert ok_response.status_code == 200

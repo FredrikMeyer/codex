@@ -37,6 +37,10 @@ jobs:
       working-directory: ./backend
       run: uv run playwright install chromium
 
+    - name: Run type checking
+      working-directory: ./backend
+      run: uv run ty check app tests
+
     - name: Run tests with coverage
       working-directory: ./backend
       run: uv run pytest --cov=app --cov-report=term --cov-report=xml

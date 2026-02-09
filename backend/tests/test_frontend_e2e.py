@@ -154,6 +154,7 @@ def test_save_and_display_entry(page: Page, frontend_url: str):
 
     # Entry should show "2 doses (Ventoline: 2)"
     entry_text = entries.first.locator(".count").text_content()
+    assert entry_text is not None
     assert "2 doses" in entry_text
     assert "Ventoline: 2" in entry_text
 
@@ -200,6 +201,7 @@ def test_switching_medicine_type_changes_counter(page: Page, frontend_url: str):
 
     # Check history shows both
     entry_text = page.locator(".entry").first.locator(".count").text_content()
+    assert entry_text is not None
     assert "3 doses" in entry_text  # 2 ventoline + 1 spray = 3 total
     assert "Spray: 1" in entry_text
     assert "Ventoline: 2" in entry_text

@@ -5,12 +5,47 @@ import random
 import secrets
 import string
 import threading
-from datetime import datetime
+from datetime import date, datetime, timezone
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from flask import Flask, jsonify, request
+from pydantic import BaseModel, Field, field_validator, ValidationError
+
+
+class LogEntry(BaseModel):
+    """Validated log entry for asthma medicine usage."""
+
+    date: str = Field(..., description="Date in YYYY-MM-DD format")
+    spray: Optional[int] = Field(None, ge=0, description="Spray doses (non-negative)")
+    ventoline: Optional[int] = Field(None, ge=0, description="Ventoline doses (non-negative)")
+
+    @field_validator("date")
+    @classmethod
+    def validate_date_format(cls, v: str) -> str:
+        """Validate date is in YYYY-MM-DD format and is a valid date."""
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError as e:
+            raise ValueError(f"Date must be in YYYY-MM-DD format and be a valid date: {e}")
+        return v
+
+    @field_validator("spray", "ventoline")
+    @classmethod
+    def validate_non_negative(cls, v: Optional[int]) -> Optional[int]:
+        """Validate counts are non-negative."""
+        if v is not None and v < 0:
+            raise ValueError("Medicine count must be non-negative")
+        return v
+
+    def model_post_init(self, __context: Any) -> None:
+        """Validate that at least one medicine type is provided with non-zero count."""
+        spray_count = self.spray or 0
+        ventoline_count = self.ventoline or 0
+
+        if spray_count == 0 and ventoline_count == 0:
+            raise ValueError("At least one medicine type must have a non-zero count")
 
 
 def _default_data() -> Dict[str, Any]:
@@ -97,7 +132,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         code = _generate_code()
         data = read_data()
         data["codes"].append(
-            {"code": code, "created_at": datetime.utcnow().isoformat() + "Z"}
+            {"code": code, "created_at": datetime.now(timezone.utc).isoformat()}
         )
         write_data(data)
         return jsonify({"code": code})
@@ -112,7 +147,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         data = read_data()
         for entry in data.get("codes", []):
             if entry["code"] == code:
-                entry["last_login_at"] = datetime.utcnow().isoformat() + "Z"
+                entry["last_login_at"] = datetime.now(timezone.utc).isoformat()
                 write_data(data)
                 return jsonify({"status": "ok"})
 
@@ -147,7 +182,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
 
         # Store token with code
         code_entry["token"] = token
-        code_entry["token_generated_at"] = datetime.utcnow().isoformat() + "Z"
+        code_entry["token_generated_at"] = datetime.now(timezone.utc).isoformat()
 
         write_data(data)
 
@@ -156,27 +191,71 @@ def create_app(data_file: str | Path | None = None) -> Flask:
     @app.post("/logs")
     def save_log() -> Any:
         payload = request.get_json(silent=True) or {}
-        code = payload.get("code")
         log = payload.get("log")
 
-        if not code or not isinstance(log, dict):
-            return (
-                jsonify({"error": "Both 'code' and 'log' (object) are required"}),
-                400,
-            )
+        if not isinstance(log, dict):
+            return jsonify({"error": "'log' (object) is required"}), 400
 
-        data = read_data()
-        matching_codes = {entry["code"] for entry in data.get("codes", [])}
-        if code not in matching_codes:
-            return jsonify({"error": "Unknown code"}), 400
+        # Validate log entry structure
+        try:
+            validated_log = LogEntry(**log)
+        except ValidationError as e:
+            # Extract first error message for simplicity
+            first_error = e.errors()[0]
+            field = first_error["loc"][0] if first_error["loc"] else "log"
+            message = first_error["msg"]
+            return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
 
-        data["logs"].append(
-            {
-                "code": code,
-                "log": log,
-                "received_at": datetime.utcnow().isoformat() + "Z",
-            }
-        )
+        # Try token authentication first (preferred)
+        auth_header = request.headers.get("Authorization", "")
+        token_valid = False
+        code_from_token = None
+
+        if auth_header.strip():
+            parts = auth_header.strip().split()
+            if len(parts) == 2 and parts[0] == "Bearer":
+                token = parts[1]
+                if token:
+                    # Validate token
+                    data = read_data()
+                    for entry in data.get("codes", []):
+                        if entry.get("token") == token:
+                            token_valid = True
+                            code_from_token = entry["code"]
+                            break
+
+                    if not token_valid:
+                        return jsonify({"error": "Invalid token"}), 401
+
+        # Fall back to code authentication if no valid token
+        if not token_valid:
+            code = payload.get("code")
+
+            if not code:
+                return (
+                    jsonify({"error": "Either 'code' in body or 'Authorization' header is required"}),
+                    400,
+                )
+
+            data = read_data()
+            matching_codes = {entry["code"] for entry in data.get("codes", [])}
+            if code not in matching_codes:
+                return jsonify({"error": "Unknown code"}), 400
+        else:
+            # Token auth succeeded, load data
+            code = code_from_token
+            data = read_data()
+
+        # Save the log
+        log_entry = {
+            "code": code,
+            "log": log,
+            "received_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        data["logs"].append(log_entry)
         write_data(data)
         return jsonify({"status": "saved"})
 

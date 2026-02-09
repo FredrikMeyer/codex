@@ -105,7 +105,7 @@ def test_e2e_invalid_code_rejection(server_url):
         f"{server_url}/logs",
         json={
             "code": "INVALID",
-            "log": {"date": "2026-02-09", "count": 1}
+            "log": {"date": "2026-02-09", "spray": 1}
         }
     )
     assert response.status_code == 400
@@ -136,13 +136,13 @@ def test_e2e_multiple_codes_are_independent(server_url):
     # Both codes should work for saving logs
     log1 = requests.post(
         f"{server_url}/logs",
-        json={"code": code1, "log": {"date": "2026-02-09", "count": 1}}
+        json={"code": code1, "log": {"date": "2026-02-09", "spray": 1}}
     )
     assert log1.status_code == 200
 
     log2 = requests.post(
         f"{server_url}/logs",
-        json={"code": code2, "log": {"date": "2026-02-10", "count": 2}}
+        json={"code": code2, "log": {"date": "2026-02-10", "spray": 2}}
     )
     assert log2.status_code == 200
 
@@ -176,3 +176,27 @@ def test_e2e_token_generation_flow(server_url):
     )
     assert token_response2.status_code == 200
     assert token_response2.json()["token"] == token
+
+
+def test_e2e_complete_token_auth_workflow(server_url):
+    """Test the complete workflow: code → token → save log with token."""
+
+    # Step 1: Generate a code
+    code_response = requests.post(f"{server_url}/generate-code")
+    code = code_response.json()["code"]
+
+    # Step 2: Generate token
+    token_response = requests.post(
+        f"{server_url}/generate-token",
+        json={"code": code}
+    )
+    token = token_response.json()["token"]
+
+    # Step 3: Save log using token (no code needed)
+    log_response = requests.post(
+        f"{server_url}/logs",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"log": {"date": "2026-02-09", "spray": 2, "ventoline": 1}}
+    )
+    assert log_response.status_code == 200
+    assert log_response.json()["status"] == "saved"

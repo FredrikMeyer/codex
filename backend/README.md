@@ -34,9 +34,15 @@ backend/
   - Note: Returns the same token if called multiple times with the same code
 
 ### Data
-- **POST `/logs`** - Store an asthma log entry
-  - Request: `{"code": "AB12", "log": {"date": "2026-02-09", "spray": 2, "ventoline": 1}}`
-  - Response: `{"status": "saved"}`
+- **POST `/logs`** - Store an asthma log entry (supports dual authentication)
+  - **Option 1 - Code auth** (backward compatible):
+    - Request: `{"code": "AB12", "log": {"date": "2026-02-09", "spray": 2, "ventoline": 1}}`
+    - Response: `{"status": "saved"}`
+  - **Option 2 - Token auth** (recommended):
+    - Headers: `Authorization: Bearer <64-char-token>`
+    - Request: `{"log": {"date": "2026-02-09", "spray": 2, "ventoline": 1}}`
+    - Response: `{"status": "saved"}`
+  - Note: Token auth is preferred; code in body is not required when using token
 
 ## Running Tests
 
@@ -44,11 +50,14 @@ backend/
 
 Use the test script from project root:
 ```bash
-# Run all tests with coverage (recommended)
+# Run all tests with coverage + type checking (recommended)
 ./test.sh
 
-# Fast mode (no coverage)
+# Fast mode (no coverage, no type checking)
 ./test.sh --fast
+
+# Type checking only
+./test.sh --typecheck
 
 # Only E2E tests
 ./test.sh --e2e
@@ -87,3 +96,20 @@ uv run pytest tests/test_login_flow.py
 # E2E tests only
 uv run pytest tests/test_e2e.py
 ```
+
+### Type Checking
+
+The project uses [ty](https://github.com/astral-sh/ty), an extremely fast Python type checker from Astral.
+
+```bash
+# Type check the codebase
+uv run ty check app tests
+
+# Type checking is automatically run with ./test.sh
+./test.sh
+
+# Run only type checking
+./test.sh --typecheck
+```
+
+Type checking is also enforced in CI - all pull requests must pass type checking.
