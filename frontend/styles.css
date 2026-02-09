@@ -55,6 +55,15 @@ main {
 .field {
   margin-bottom: 16px;
 }
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.field-row .field {
+  margin-bottom: 0;
+}
 label {
   display: block;
   margin-bottom: 6px;
@@ -67,6 +76,37 @@ input[type="date"] {
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.05);
   color: var(--text);
+}
+
+.medicine-type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.medicine-type {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+.medicine-type:hover {
+  background: rgba(255,255,255,0.08);
+}
+.medicine-type:active {
+  transform: scale(0.97);
+}
+.medicine-type.active {
+  background: rgba(37,99,235,0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.medicine-type.active:hover {
+  background: rgba(37,99,235,0.3);
 }
 
 .counter {
@@ -160,6 +200,9 @@ button.ghost {
 }
 .entry .count {
   color: var(--muted);
+}
+.entry .breakdown {
+  font-size: 0.85rem;
 }
 
 #toast {

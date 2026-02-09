@@ -16,9 +16,19 @@
 
   <main>
     <section class="card">
-      <div class="field">
-        <label for="usage-date">Date</label>
-        <input type="date" id="usage-date" required>
+      <div class="field-row">
+        <div class="field">
+          <label for="usage-date">Date</label>
+          <input type="date" id="usage-date" required>
+        </div>
+
+        <div class="field">
+          <label>Medicine Type</label>
+          <div class="medicine-type-selector">
+            <button class="medicine-type" data-type="spray">Spray</button>
+            <button class="medicine-type" data-type="ventoline">Ventoline</button>
+          </div>
+        </div>
       </div>
 
       <div class="field">
