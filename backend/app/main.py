@@ -16,6 +16,7 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, Field, field_validator, ValidationError
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 class LogEntry(BaseModel):
@@ -109,6 +110,16 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "OPTIONS"]
     )
+
+    # Configure proxy support for production (behind nginx)
+    if app.config["PRODUCTION"]:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=1,    # Trust X-Forwarded-For (real client IP)
+            x_proto=1,  # Trust X-Forwarded-Proto (original protocol)
+            x_host=1,   # Trust X-Forwarded-Host (original host)
+            x_prefix=1  # Trust X-Forwarded-Prefix (URL prefix)
+        )
 
     # Configure rate limiting
     limiter = Limiter(

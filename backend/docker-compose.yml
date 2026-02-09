@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  asthma-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: asthma-backend
+    restart: unless-stopped
+
+    # Port mapping (only expose to localhost, nginx will proxy)
+    ports:
+      - "127.0.0.1:5000:5000"
+
+    # Environment variables
+    environment:
+      - PRODUCTION=true
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://fredrikmeyer.github.io}
+      - DATA_FILE=/app/data/storage.json
+
+    # Persist data between container restarts
+    volumes:
+      - ./data:/app/data
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/test-protected').read()"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Resource limits (adjust based on your server)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
