@@ -7,4 +7,6 @@ dependencies = [
     "flask==3.0.3",
     "pytest==8.3.2",
     "pytest-cov>=7.0.0",
+    "pytest-playwright>=0.7.2",
+    "requests>=2.32.5",
 ]
