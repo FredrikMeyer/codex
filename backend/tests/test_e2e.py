@@ -145,3 +145,34 @@ def test_e2e_multiple_codes_are_independent(server_url):
         json={"code": code2, "log": {"date": "2026-02-10", "count": 2}}
     )
     assert log2.status_code == 200
+
+
+def test_e2e_token_generation_flow(server_url):
+    """Test the complete token generation flow."""
+
+    # Step 1: Generate a code
+    code_response = requests.post(f"{server_url}/generate-code")
+    assert code_response.status_code == 200
+    code = code_response.json()["code"]
+
+    # Step 2: Exchange code for token
+    token_response = requests.post(
+        f"{server_url}/generate-token",
+        json={"code": code}
+    )
+    assert token_response.status_code == 200
+    data = token_response.json()
+    assert "token" in data
+    token = data["token"]
+
+    # Token should be long and hex
+    assert len(token) >= 32
+    assert all(c in "0123456789abcdef" for c in token)
+
+    # Step 3: Requesting token again with same code returns same token
+    token_response2 = requests.post(
+        f"{server_url}/generate-token",
+        json={"code": code}
+    )
+    assert token_response2.status_code == 200
+    assert token_response2.json()["token"] == token

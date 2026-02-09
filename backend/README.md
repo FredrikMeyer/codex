@@ -18,6 +18,26 @@ backend/
 - `uv add <package>` - to add new dependencies
 - `uv sync` - to sync dependencies from the lockfile
 
+## API Endpoints
+
+### Authentication
+- **POST `/generate-code`** - Generate a new 4-character authentication code
+  - Response: `{"code": "AB12"}`
+
+- **POST `/login`** - Validate an authentication code
+  - Request: `{"code": "AB12"}`
+  - Response: `{"status": "ok"}`
+
+- **POST `/generate-token`** - Exchange a code for a long-lived API token
+  - Request: `{"code": "AB12"}`
+  - Response: `{"token": "64-char-hex-string"}`
+  - Note: Returns the same token if called multiple times with the same code
+
+### Data
+- **POST `/logs`** - Store an asthma log entry
+  - Request: `{"code": "AB12", "log": {"date": "2026-02-09", "spray": 2, "ventoline": 1}}`
+  - Response: `{"status": "saved"}`
+
 ## Running Tests
 
 ### Quick Start
