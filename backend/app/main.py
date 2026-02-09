@@ -10,6 +10,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from pydantic import BaseModel, Field, field_validator, ValidationError
@@ -76,15 +77,28 @@ def _generate_code() -> str:
 
 
 def create_app(data_file: str | Path | None = None) -> Flask:
+    # Load environment variables from .env file if present
+    load_dotenv()
+
     app = Flask(__name__)
+
+    # Configure data file path
+    # Priority: parameter > DATA_FILE env > ASTHMA_DATA_FILE env > default
     app.config["DATA_FILE"] = Path(
-        data_file or os.environ.get("ASTHMA_DATA_FILE") or "backend/data/storage.json"
+        data_file or os.environ.get("DATA_FILE") or os.environ.get("ASTHMA_DATA_FILE") or "backend/data/storage.json"
     )
+
+    # Configure production mode
+    production_value = os.environ.get("PRODUCTION", "false").lower()
+    app.config["PRODUCTION"] = production_value in ("true", "1")
 
     # Configure CORS
     allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
     # Split comma-separated origins or use single origin/wildcard
     origins = [origin.strip() for origin in allowed_origins.split(",")] if "," in allowed_origins else allowed_origins
+
+    # Store in config for testing
+    app.config["ALLOWED_ORIGINS"] = allowed_origins
 
     CORS(
         app,

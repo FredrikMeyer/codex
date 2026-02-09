@@ -14,8 +14,61 @@ class level JavaDoc comment.
 You strive to keep state immutable for a less complicated and safer programming model.
 
 ## Pure Functions
-You prefer functions without side effects. If side-effects are necessary, we extract as much as possible of the behaviour 
+You prefer functions without side effects. If side-effects are necessary, we extract as much as possible of the behaviour
 into pure functions.
+
+## Framework Independence
+Keep business logic separate from framework-specific code to enable flexibility and testability.
+
+**Core Principle**: Business logic should not depend on web frameworks (Flask, FastAPI, etc). This allows:
+- Easy testing without framework overhead
+- Framework migration without rewriting logic
+- Reuse of logic in different contexts (CLI, API, background jobs)
+
+**Pattern**: Thin controller layer + Framework-independent domain layer
+
+```python
+# ❌ Bad: Business logic tightly coupled to Flask
+@app.post("/logs")
+def save_log():
+    payload = request.get_json()
+    # Validation logic mixed with Flask
+    # Storage logic mixed with Flask
+    # All logic lives in route handler
+```
+
+```python
+# ✅ Good: Business logic separate from Flask
+# Domain layer (framework-independent)
+class LogService:
+    def save_log(self, log_data: dict) -> Result:
+        validated = self._validate_log(log_data)
+        return self._store_log(validated)
+
+# Controller layer (thin Flask adapter)
+@app.post("/logs")
+def save_log():
+    payload = request.get_json()
+    result = log_service.save_log(payload)
+    return jsonify(result.to_dict())
+```
+
+**When to apply**:
+- Immediately for non-trivial business logic
+- When logic exceeds ~10 lines
+- When logic might be reused elsewhere
+- When testing requires framework mocking
+
+**When not to apply**:
+- Simple CRUD endpoints with minimal logic
+- Pure request/response transformation
+- Framework-specific middleware
+
+**Benefits**:
+- **Testable**: Test business logic without Flask test client
+- **Portable**: Can switch Flask → FastAPI → anything
+- **Reusable**: Use same logic in CLI tools, background jobs, etc
+- **Clear**: Separation of concerns makes code easier to understand
 
 ## Tidy First
 You separate all changes into two distinct types:
