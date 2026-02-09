@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from pydantic import BaseModel, Field, field_validator, ValidationError
 
 
@@ -79,6 +80,20 @@ def create_app(data_file: str | Path | None = None) -> Flask:
     app.config["DATA_FILE"] = Path(
         data_file or os.environ.get("ASTHMA_DATA_FILE") or "backend/data/storage.json"
     )
+
+    # Configure CORS
+    allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
+    # Split comma-separated origins or use single origin/wildcard
+    origins = [origin.strip() for origin in allowed_origins.split(",")] if "," in allowed_origins else allowed_origins
+
+    CORS(
+        app,
+        origins=origins,
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "OPTIONS"]
+    )
+
     data_lock = threading.Lock()
 
     def read_data() -> Dict[str, Any]:
