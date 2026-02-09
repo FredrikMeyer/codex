@@ -13,6 +13,8 @@ from typing import Any, Callable, Dict, Optional
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, Field, field_validator, ValidationError
 
 
@@ -108,6 +110,32 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         methods=["GET", "POST", "OPTIONS"]
     )
 
+    # Configure rate limiting
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],  # No default limits, set per-endpoint
+        storage_uri="memory://",  # In-memory storage for simplicity
+    )
+
+    # Custom error handler for rate limit exceeded
+    @app.errorhandler(429)
+    def ratelimit_handler(e: Any) -> tuple[Any, int]:
+        response = jsonify({
+            "error": "Rate limit exceeded",
+            "message": str(e.description)
+        })
+        # Add Retry-After header (in seconds)
+        # Extract the window from the description if possible, default to 60 seconds
+        retry_after = 60  # Default: retry after 1 minute
+        if hasattr(e, 'limit'):
+            limit = e.limit
+            # Parse limit like "5 per 1 hour" to get window in seconds
+            if hasattr(limit, 'per'):
+                retry_after = int(limit.per)
+        response.headers['Retry-After'] = str(retry_after)
+        return response, 429
+
     data_lock = threading.Lock()
 
     def read_data() -> Dict[str, Any]:
@@ -157,6 +185,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         return decorator
 
     @app.post("/generate-code")
+    @limiter.limit("5 per hour")
     def generate_code() -> Any:
         code = _generate_code()
         data = read_data()
@@ -167,6 +196,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         return jsonify({"code": code})
 
     @app.post("/login")
+    @limiter.limit("10 per minute")
     def login() -> Any:
         payload = request.get_json(silent=True) or {}
         code = payload.get("code")
@@ -183,6 +213,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         return jsonify({"error": "Invalid code"}), 400
 
     @app.post("/generate-token")
+    @limiter.limit("10 per minute")
     def generate_token() -> Any:
         payload = request.get_json(silent=True) or {}
         code = payload.get("code")
@@ -218,6 +249,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         return jsonify({"token": token})
 
     @app.post("/logs")
+    @limiter.limit("100 per minute")
     def save_log() -> Any:
         payload = request.get_json(silent=True) or {}
         log = payload.get("log")
