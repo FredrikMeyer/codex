@@ -17,6 +17,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  (no args)     Run all backend tests with coverage + type checking"
+    echo "  --ci          Run tests for CI (includes XML coverage for codecov)"
     echo "  --fast        Run tests without coverage (faster)"
     echo "  --typecheck   Run only type checking with ty"
     echo "  --e2e         Run only backend E2E tests"
@@ -27,6 +28,7 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  ./test.sh                 # All tests with coverage + type checking"
+    echo "  ./test.sh --ci            # CI mode with XML coverage"
     echo "  ./test.sh --fast          # Quick test run"
     echo "  ./test.sh --typecheck     # Just type checking"
     echo "  ./test.sh --e2e           # Just E2E tests"
@@ -46,6 +48,38 @@ echo ""
 cd backend
 
 case "$1" in
+    --ci)
+        echo -e "${YELLOW}🔍 Running type checking with ty${NC}"
+        echo ""
+        uv run ty check app tests
+        TYPE_EXIT_CODE=$?
+
+        if [ $TYPE_EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}✓ Type checking passed!${NC}"
+        else
+            echo ""
+            echo -e "${RED}✗ Type checking failed${NC}"
+            exit $TYPE_EXIT_CODE
+        fi
+
+        echo ""
+        echo -e "${YELLOW}🧪 Running all tests with coverage (CI mode)${NC}"
+        echo ""
+        uv run pytest --cov=app --cov-report=term --cov-report=xml -v
+
+        TEST_EXIT_CODE=$?
+
+        if [ $TEST_EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}✓ All tests passed!${NC}"
+            echo -e "${BLUE}📊 XML coverage report: backend/coverage.xml${NC}"
+        else
+            echo ""
+            echo -e "${RED}✗ Tests failed${NC}"
+            exit $TEST_EXIT_CODE
+        fi
+        ;;
     --fast)
         echo -e "${YELLOW}⚡ Fast mode: running tests without coverage${NC}"
         echo ""
