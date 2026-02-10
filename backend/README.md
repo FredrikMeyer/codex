@@ -1,4 +1,32 @@
-# Backend
+# Asthma Tracker Backend
+
+Flask API for tracking asthma medication usage with token authentication and rate limiting.
+
+## Features
+
+- ✅ Token-based authentication
+- ✅ Rate limiting per IP address
+- ✅ CORS configuration
+- ✅ Environment-based configuration
+- ✅ Production-ready with ProxyFix for nginx
+- ✅ Docker support
+- ✅ 90 tests with 96.60% coverage
+
+## Deployment
+
+**Production deployment with Docker (Recommended):**
+
+See [DEPLOY.md](../DEPLOY.md) for complete guide using GitHub Container Registry.
+
+```bash
+# Pull latest image from GitHub
+docker compose -f docker-compose.prod.yml pull
+
+# Start container
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Images are automatically built and published to `ghcr.io/fredrikmeyer/codex/backend` on every push to main.
 
 ## Project Structure
 
