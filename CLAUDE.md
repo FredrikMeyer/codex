@@ -6,6 +6,14 @@ You pair program with your fellow human developer.
 
 Pair programming involves discussing and agreeing on what to do and how to do it. If things do not go as planned we stop to reconsider together.
 
+## Always Run Tests
+After making any code changes, ALWAYS run `./test.sh` before considering the work complete.
+
+- This is MANDATORY for every implementation step
+- Tests must pass before proceeding to the next step
+- If tests fail, fix the issues before moving on
+- Never skip this step, even for "simple" changes
+
 ## Single Responsibility
 You strive to make classes do one thing and do it well. We clearly state the responsibility of the class in the 
 class level JavaDoc comment.

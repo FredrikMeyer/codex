@@ -1,7 +1,8 @@
 // Backend Configuration
-const backendUrl = window.location.hostname === 'localhost'
+// Allow override via window.backendUrl for testing
+const backendUrl = window.backendUrl || (window.location.hostname === 'localhost'
   ? 'http://localhost:5000'
-  : 'https://asthma.fredrikmeyer.net';
+  : 'https://asthma.fredrikmeyer.net');
 
 // Storage keys
 const storageKey = 'asthma-usage-entries';
@@ -225,6 +226,127 @@ exportBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
   toast('CSV exported');
 });
+
+// Sync setup DOM elements
+const syncStatusText = document.getElementById('sync-status-text');
+const syncStatusDot = document.querySelector('.status-dot');
+const syncSetupSection = document.getElementById('sync-setup');
+const syncConfiguredSection = document.getElementById('sync-configured');
+const generateCodeBtn = document.getElementById('generate-code');
+const generatedCodeDisplay = document.getElementById('generated-code');
+const codeInput = document.getElementById('code-input');
+const completeSetupBtn = document.getElementById('complete-setup');
+const disconnectBtn = document.getElementById('disconnect-sync');
+
+// Update sync status UI
+function updateSyncStatus() {
+  const isConfigured = hasToken();
+  if (isConfigured) {
+    syncStatusText.textContent = 'Connected';
+    syncStatusDot.classList.add('connected');
+    syncSetupSection.style.display = 'none';
+    syncConfiguredSection.style.display = 'block';
+  } else {
+    syncStatusText.textContent = 'Not configured';
+    syncStatusDot.classList.remove('connected');
+    syncSetupSection.style.display = 'block';
+    syncConfiguredSection.style.display = 'none';
+  }
+}
+
+// Generate setup code from backend
+async function generateCode() {
+  try {
+    generateCodeBtn.disabled = true;
+    generateCodeBtn.textContent = 'Generating...';
+
+    const response = await fetch(`${backendUrl}/generate-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate code');
+    }
+
+    const data = await response.json();
+    generatedCodeDisplay.textContent = data.code;
+    generatedCodeDisplay.classList.add('show');
+    toast('Code generated! Enter it below to complete setup.');
+  } catch (error) {
+    toast('Failed to generate code. Check your connection.');
+    console.error('Generate code error:', error);
+  } finally {
+    generateCodeBtn.disabled = false;
+    generateCodeBtn.textContent = 'Generate Code';
+  }
+}
+
+// Complete setup by exchanging code for token
+async function completeSetup() {
+  const code = codeInput.value.trim().toUpperCase();
+  if (!code) {
+    toast('Please enter a code');
+    return;
+  }
+
+  try {
+    completeSetupBtn.disabled = true;
+    completeSetupBtn.textContent = 'Connecting...';
+
+    const response = await fetch(`${backendUrl}/generate-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Invalid code');
+    }
+
+    const data = await response.json();
+    setToken(data.token);
+
+    // Clear UI
+    codeInput.value = '';
+    generatedCodeDisplay.textContent = '';
+    generatedCodeDisplay.classList.remove('show');
+
+    updateSyncStatus();
+    toast('Cloud sync connected!');
+  } catch (error) {
+    toast(error.message || 'Failed to connect. Please try again.');
+    console.error('Complete setup error:', error);
+  } finally {
+    completeSetupBtn.disabled = false;
+    completeSetupBtn.textContent = 'Complete Setup';
+  }
+}
+
+// Disconnect sync
+function disconnectSync() {
+  if (confirm('Are you sure you want to disconnect cloud sync? Your local data will remain safe.')) {
+    clearToken();
+    updateSyncStatus();
+    toast('Cloud sync disconnected');
+  }
+}
+
+// Event listeners for sync setup
+generateCodeBtn.addEventListener('click', generateCode);
+completeSetupBtn.addEventListener('click', completeSetup);
+disconnectBtn.addEventListener('click', disconnectSync);
+
+// Handle Enter key in code input
+codeInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    completeSetup();
+  }
+});
+
+// Initialize sync status on page load
+updateSyncStatus();
 
 const BASE_PATH = '/codex/';
 

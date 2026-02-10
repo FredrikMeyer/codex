@@ -50,6 +50,43 @@
     <section class="card">
       <div class="section-heading">
         <div>
+          <div class="label">Cloud Sync</div>
+          <div class="subtitle">Optional backup to secure cloud storage.</div>
+        </div>
+      </div>
+
+      <div id="sync-status" class="sync-status">
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          <span id="sync-status-text">Not configured</span>
+        </div>
+      </div>
+
+      <div id="sync-setup" class="sync-setup">
+        <div class="setup-step">
+          <p class="hint">Step 1: Generate a setup code from the server</p>
+          <button id="generate-code" class="ghost">Generate Code</button>
+          <div id="generated-code" class="code-display"></div>
+        </div>
+
+        <div class="setup-step">
+          <p class="hint">Step 2: Enter the code to complete setup</p>
+          <div class="code-input-group">
+            <input type="text" id="code-input" placeholder="Enter setup code" maxlength="6">
+            <button id="complete-setup" class="primary">Complete Setup</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="sync-configured" class="sync-configured" style="display: none;">
+        <p class="hint">Your device is connected to cloud storage.</p>
+        <button id="disconnect-sync" class="ghost">Disconnect</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading">
+        <div>
           <div class="label">History</div>
           <div class="subtitle">Stored on this device for offline access.</div>
         </div>
