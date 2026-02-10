@@ -18,7 +18,8 @@ let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
 
 function normalizeEntry(value) {
   if (typeof value === 'number') {
-    return { spray: value, ventoline: 0 };
+    // Old format: just a number → treat as ventoline (not spray)
+    return { spray: 0, ventoline: value };
   }
   return { spray: value.spray || 0, ventoline: value.ventoline || 0 };
 }
@@ -30,6 +31,28 @@ function loadEntries() {
   } catch (_) {
     return {};
   }
+}
+
+// One-time migration: flip old entries from spray→ventoline
+function migrateOldData(entries) {
+  const migrationKey = 'asthma-migrated-v1';
+  if (localStorage.getItem(migrationKey)) {
+    return entries; // Already migrated
+  }
+
+  const migrated = {};
+  for (const [date, value] of Object.entries(entries)) {
+    const normalized = normalizeEntry(value);
+    // If entry has ONLY spray (no ventoline), flip it
+    if (normalized.spray > 0 && normalized.ventoline === 0) {
+      migrated[date] = { spray: 0, ventoline: normalized.spray };
+    } else {
+      migrated[date] = normalized;
+    }
+  }
+
+  localStorage.setItem(migrationKey, 'true');
+  return migrated;
 }
 
 function getEntryForDate(entries, date) {
@@ -94,7 +117,9 @@ function updateCountForCurrentSelection() {
   updateCount(entry[selectedMedicineType]);
 }
 
-const entries = loadEntries();
+let entries = loadEntries();
+entries = migrateOldData(entries);
+saveEntries(entries); // Save migrated data
 
 // Set active medicine type button based on stored preference
 medicineTypeButtons.forEach((btn) => {
