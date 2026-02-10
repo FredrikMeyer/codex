@@ -1,5 +1,35 @@
+// Backend Configuration
+const backendUrl = window.location.hostname === 'localhost'
+  ? 'http://localhost:5000'
+  : 'https://asthma.fredrikmeyer.net';
+
+// Storage keys
 const storageKey = 'asthma-usage-entries';
 const lastTypeKey = 'asthma-last-medicine-type';
+const tokenKey = 'asthma-auth-token';
+
+// Token management functions
+function getToken() {
+  return localStorage.getItem(tokenKey);
+}
+
+function setToken(token) {
+  if (!token) {
+    throw new Error('Token cannot be empty');
+  }
+  localStorage.setItem(tokenKey, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(tokenKey);
+}
+
+function hasToken() {
+  const token = getToken();
+  return token !== null && token !== '';
+}
+
+// DOM elements
 const usageDate = document.getElementById('usage-date');
 const countEl = document.getElementById('count');
 const incBtn = document.getElementById('increment');
