@@ -54,3 +54,13 @@ def test_logs_endpoint_requires_known_code_and_persists_log(client):
         "/logs", json={"code": "FFFF", "log": {"date": "2024-01-01"}}
     )
     assert bad_response.status_code == 400
+
+
+def test_health_endpoint_returns_ok(client):
+    test_client, _ = client
+    response = test_client.get("/health")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["status"] == "ok"
+    assert "version" in body

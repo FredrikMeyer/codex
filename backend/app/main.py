@@ -331,6 +331,11 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         write_data(data)
         return jsonify({"status": "saved"})
 
+    @app.get("/health")
+    def health() -> Any:
+        """Health check endpoint for monitoring and container health checks."""
+        return jsonify({"status": "ok", "version": "0.1.0"})
+
     @app.get("/test-protected")
     @require_auth()
     def test_protected() -> Any:
