@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from app.main import create_app, _load_data
+from app.main import create_app
+from app.storage import load_data
 
 
 @pytest.fixture()
@@ -89,7 +90,7 @@ def test_token_is_persisted_with_code(client):
     token = test_client.post("/generate-token", json={"code": code}).get_json()["token"]
 
     # Check that token is stored
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
 
     # Find the code entry
     code_entry = next(entry for entry in saved_data["codes"] if entry["code"] == code)
@@ -125,7 +126,7 @@ def test_token_generation_updates_timestamp(client):
     test_client.post("/generate-token", json={"code": code})
 
     # Check timestamp exists
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
     code_entry = next(entry for entry in saved_data["codes"] if entry["code"] == code)
 
     assert "token_generated_at" in code_entry

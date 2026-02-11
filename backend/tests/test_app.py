@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from app.main import create_app, _load_data
+from app.main import create_app
+from app.storage import load_data
 
 
 @pytest.fixture()
@@ -23,7 +24,7 @@ def test_generate_code_creates_and_persists_code(client):
     assert "code" in body
     assert len(body["code"]) == 4
 
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
     assert any(entry["code"] == body["code"] for entry in saved_data["codes"])
 
 
@@ -33,7 +34,7 @@ def test_login_accepts_valid_code_and_rejects_invalid(client):
 
     ok_response = test_client.post("/login", json={"code": generated})
     assert ok_response.status_code == 200
-    saved = _load_data(data_file)
+    saved = load_data(data_file)
     assert any(entry.get("last_login_at") for entry in saved["codes"])
 
     bad_response = test_client.post("/login", json={"code": "ZZZZ"})
@@ -47,7 +48,7 @@ def test_logs_endpoint_requires_known_code_and_persists_log(client):
 
     ok_response = test_client.post("/logs", json=payload)
     assert ok_response.status_code == 200
-    saved = _load_data(data_file)
+    saved = load_data(data_file)
     assert saved["logs"][0]["log"] == payload["log"]
 
     bad_response = test_client.post(

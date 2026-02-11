@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from app.main import create_app, _load_data
+from app.main import create_app
+from app.storage import load_data
 
 
 @pytest.fixture()
@@ -56,7 +57,7 @@ def test_logs_endpoint_accepts_code_auth(auth_credentials):
     assert data["status"] == "saved"
 
     # Verify log was saved
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
     assert len(saved_data["logs"]) == 1
     assert saved_data["logs"][0]["code"] == code
 
@@ -78,7 +79,7 @@ def test_logs_endpoint_accepts_token_auth(auth_credentials):
     assert data["status"] == "saved"
 
     # Verify log was saved
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
     assert len(saved_data["logs"]) == 1
 
 
@@ -189,7 +190,7 @@ def test_logs_stores_which_auth_method_used(auth_credentials):
     )
 
     # Check stored data
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
     assert len(saved_data["logs"]) == 2
 
     # First log should have code
@@ -228,5 +229,5 @@ def test_multiple_users_with_different_tokens(client):
     assert response2.status_code == 200
 
     # Both logs should be saved
-    saved_data = _load_data(data_file)
+    saved_data = load_data(data_file)
     assert len(saved_data["logs"]) == 2

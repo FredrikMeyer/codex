@@ -18,6 +18,9 @@ from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, Field, field_validator, ValidationError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from .repository import LogRepository
+from .storage import load_data, save_data
+
 
 class LogEntry(BaseModel):
     """Validated log entry for asthma medicine usage."""
@@ -53,26 +56,7 @@ class LogEntry(BaseModel):
             raise ValueError("At least one medicine type must have a non-zero count")
 
 
-def _default_data() -> Dict[str, Any]:
-    return {"codes": [], "logs": []}
-
-
-def _ensure_data_file(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.write_text(json.dumps(_default_data(), indent=2))
-
-
-def _load_data(path: Path) -> Dict[str, Any]:
-    _ensure_data_file(path)
-    with path.open() as fp:
-        return json.load(fp)
-
-
-def _save_data(path: Path, data: Dict[str, Any]) -> None:
-    _ensure_data_file(path)
-    with path.open("w") as fp:
-        json.dump(data, fp, indent=2)
+# Storage functions moved to storage.py module
 
 
 def _generate_code() -> str:
@@ -147,15 +131,18 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         response.headers['Retry-After'] = str(retry_after)
         return response, 429
 
+    # Create repository for data access
+    log_repository = LogRepository(app.config["DATA_FILE"])
+
     data_lock = threading.Lock()
 
     def read_data() -> Dict[str, Any]:
         with data_lock:
-            return _load_data(app.config["DATA_FILE"])
+            return load_data(app.config["DATA_FILE"])
 
     def write_data(data: Dict[str, Any]) -> None:
         with data_lock:
-            _save_data(app.config["DATA_FILE"], data)
+            save_data(app.config["DATA_FILE"], data)
 
     def require_auth() -> Callable:
         """Decorator to require token authentication."""
@@ -318,17 +305,11 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         else:
             # Token auth succeeded, load data
             code = code_from_token
+            assert code is not None, "code_from_token must be set when token_valid is True"
             data = read_data()
 
-        # Save the log
-        log_entry = {
-            "code": code,
-            "log": log,
-            "received_at": datetime.now(timezone.utc).isoformat(),
-        }
-
-        data["logs"].append(log_entry)
-        write_data(data)
+        # Save the log using repository
+        log_repository.save_log(code, log)
         return jsonify({"status": "saved"})
 
     @app.get("/health")
