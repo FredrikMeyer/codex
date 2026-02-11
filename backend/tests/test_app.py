@@ -22,7 +22,7 @@ def test_generate_code_creates_and_persists_code(client):
     assert response.status_code == 200
     body = response.get_json()
     assert "code" in body
-    assert len(body["code"]) == 4
+    assert len(body["code"]) == 6
 
     saved_data = load_data(data_file)
     assert any(entry["code"] == body["code"] for entry in saved_data["codes"])

@@ -490,7 +490,7 @@ def test_sync_token_flow_with_backend(page: Page, frontend_url: str, backend_url
     # Get the code from the display
     code = code_display.text_content()
     assert code is not None
-    assert len(code.strip()) == 4
+    assert len(code.strip()) == 6
 
     # Step 2: Enter the code in the input field
     code_input = page.locator("#code-input")
@@ -596,9 +596,9 @@ def test_sync_invalid_code_shows_error(page: Page, frontend_url: str, backend_ur
     page.evaluate("localStorage.removeItem('asthma-auth-token')")
     page.reload()
 
-    # Enter invalid code
+    # Enter invalid code (6 characters)
     code_input = page.locator("#code-input")
-    code_input.fill("XXXX")
+    code_input.fill("XXXXXX")
 
     # Click complete setup
     complete_btn = page.locator("#complete-setup")

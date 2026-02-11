@@ -60,7 +60,7 @@ class LogEntry(BaseModel):
 
 
 def _generate_code() -> str:
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 
 def create_app(data_file: str | Path | None = None) -> Flask:

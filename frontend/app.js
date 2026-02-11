@@ -293,6 +293,11 @@ async function completeSetup() {
     return;
   }
 
+  if (code.length !== 6) {
+    toast('Code must be 6 characters');
+    return;
+  }
+
   try {
     completeSetupBtn.disabled = true;
     completeSetupBtn.textContent = 'Connecting...';

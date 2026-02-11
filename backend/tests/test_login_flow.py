@@ -26,7 +26,7 @@ def test_generate_code_and_login(client):
     data = response.get_json()
     assert "code" in data
     code = data["code"]
-    assert len(code) == 4
+    assert len(code) == 6
 
     login_response = client.post("/login", json={"code": code})
     assert login_response.status_code == 200

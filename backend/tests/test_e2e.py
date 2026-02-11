@@ -60,7 +60,7 @@ def test_e2e_generate_code_and_login_flow(server_url):
     data = response.json()
     assert "code" in data
     code = data["code"]
-    assert len(code) == 4
+    assert len(code) == 6
 
     # Step 2: Login with the code
     login_response = requests.post(
