@@ -172,6 +172,10 @@ button.ghost {
 .section-heading .label {
   font-weight: 700;
 }
+.button-group {
+  display: flex;
+  gap: 8px;
+}
 
 #export {
   padding: 10px 14px;

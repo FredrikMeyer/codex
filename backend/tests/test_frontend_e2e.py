@@ -614,3 +614,75 @@ def test_sync_invalid_code_shows_error(page: Page, frontend_url: str, backend_ur
 
     # Should still be not configured
     expect(page.locator("#sync-status-text")).to_contain_text("Not configured")
+
+
+def test_sync_to_cloud_functionality(page: Page, frontend_url: str, backend_url):
+    """Test syncing entries to the cloud."""
+    backend_base_url, data_file = backend_url
+    page.add_init_script(f"window.backendUrl = '{backend_base_url}';")
+    page.goto(frontend_url)
+
+    # Clear local storage
+    page.evaluate("localStorage.clear()")
+    page.reload()
+
+    # Sync button should be hidden when not configured
+    sync_btn = page.locator("#sync-to-cloud")
+    expect(sync_btn).not_to_be_visible()
+
+    # Set up sync
+    generate_btn = page.locator("#generate-code")
+    generate_btn.click()
+    page.wait_for_timeout(2000)
+
+    code_display = page.locator("#generated-code")
+    expect(code_display).to_be_visible()
+    code = code_display.text_content()
+    assert code is not None
+
+    code_input = page.locator("#code-input")
+    code_input.fill(code)
+
+    complete_btn = page.locator("#complete-setup")
+    complete_btn.click()
+    page.wait_for_timeout(2000)
+
+    # Sync button should now be visible
+    expect(sync_btn).to_be_visible()
+
+    # Create some entries
+    increment_btn = page.locator("#increment")
+    save_btn = page.locator("#save")
+
+    # Save entry 1
+    increment_btn.click()
+    increment_btn.click()
+    save_btn.click()
+    page.wait_for_timeout(500)
+
+    # Change date and save entry 2
+    page.evaluate("document.getElementById('usage-date').valueAsDate = new Date('2026-02-09')")
+    page.locator("#increment").click()
+    save_btn.click()
+    page.wait_for_timeout(500)
+
+    # Verify entries exist locally
+    entries = page.locator(".entry")
+    expect(entries).to_have_count(2)
+
+    # Click sync button
+    sync_btn.click()
+
+    # Wait for toast to appear and verify it
+    toast = page.locator("#toast")
+    expect(toast).to_contain_text("Synced", timeout=5000)
+
+    # Wait for sync to complete
+    page.wait_for_timeout(2000)
+
+    # Verify data was saved to backend
+    from app.storage import load_data
+    data = load_data(data_file)
+    logs = data.get("logs", [])
+    # Should have 2 entries synced
+    assert len(logs) >= 2

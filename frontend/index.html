@@ -90,7 +90,10 @@
           <div class="label">History</div>
           <div class="subtitle">Stored on this device for offline access.</div>
         </div>
-        <button id="export">Export CSV</button>
+        <div class="button-group">
+          <button id="sync-to-cloud" class="primary" style="display: none;">Sync to Cloud</button>
+          <button id="export" class="ghost">Export CSV</button>
+        </div>
       </div>
       <div id="entries" class="entries" aria-live="polite"></div>
     </section>

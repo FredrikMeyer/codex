@@ -38,6 +38,7 @@ const decBtn = document.getElementById('decrement');
 const saveBtn = document.getElementById('save');
 const resetBtn = document.getElementById('reset-day');
 const exportBtn = document.getElementById('export');
+const syncToCloudBtn = document.getElementById('sync-to-cloud');
 const entriesEl = document.getElementById('entries');
 const toastEl = document.getElementById('toast');
 const medicineTypeButtons = document.querySelectorAll('.medicine-type');
@@ -246,11 +247,13 @@ function updateSyncStatus() {
     syncStatusDot.classList.add('connected');
     syncSetupSection.style.display = 'none';
     syncConfiguredSection.style.display = 'block';
+    syncToCloudBtn.style.display = 'block';
   } else {
     syncStatusText.textContent = 'Not configured';
     syncStatusDot.classList.remove('connected');
     syncSetupSection.style.display = 'block';
     syncConfiguredSection.style.display = 'none';
+    syncToCloudBtn.style.display = 'none';
   }
 }
 
@@ -333,10 +336,81 @@ function disconnectSync() {
   }
 }
 
+// Sync entries to cloud
+async function syncToCloud() {
+  const token = getToken();
+  if (!token) {
+    toast('Please set up cloud sync first');
+    return;
+  }
+
+  const dates = Object.keys(entries);
+  if (dates.length === 0) {
+    toast('No entries to sync');
+    return;
+  }
+
+  try {
+    syncToCloudBtn.disabled = true;
+    syncToCloudBtn.textContent = 'Syncing...';
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Send each entry to the backend
+    for (const date of dates) {
+      const entry = normalizeEntry(entries[date]);
+
+      try {
+        const response = await fetch(`${backendUrl}/logs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            log: {
+              date: date,
+              spray: entry.spray,
+              ventoline: entry.ventoline
+            }
+          })
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+          console.error(`Failed to sync entry for ${date}:`, await response.text());
+        }
+      } catch (error) {
+        errorCount++;
+        console.error(`Network error syncing entry for ${date}:`, error);
+      }
+    }
+
+    // Show result
+    if (errorCount === 0) {
+      toast(`✓ Synced ${successCount} ${successCount === 1 ? 'entry' : 'entries'} to cloud`);
+    } else if (successCount > 0) {
+      toast(`⚠ Synced ${successCount} entries, ${errorCount} failed`);
+    } else {
+      toast('✗ Sync failed. Check your connection.');
+    }
+  } catch (error) {
+    toast('Sync failed. Check your connection.');
+    console.error('Sync error:', error);
+  } finally {
+    syncToCloudBtn.disabled = false;
+    syncToCloudBtn.textContent = 'Sync to Cloud';
+  }
+}
+
 // Event listeners for sync setup
 generateCodeBtn.addEventListener('click', generateCode);
 completeSetupBtn.addEventListener('click', completeSetup);
 disconnectBtn.addEventListener('click', disconnectSync);
+syncToCloudBtn.addEventListener('click', syncToCloud);
 
 // Handle Enter key in code input
 codeInput.addEventListener('keypress', (e) => {
