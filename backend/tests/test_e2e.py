@@ -31,7 +31,8 @@ def server_url(tmp_path_factory):
     data_file = tmp_dir / "test_storage.json"
 
     app = create_app(data_file=data_file)
-    port = 5001
+    # Use port 5556 to avoid conflicts with other test servers (5555 is used by frontend E2E tests)
+    port = 5556
     server_thread = ServerThread(app, port)
     server_thread.start()
 
