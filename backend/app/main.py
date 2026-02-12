@@ -345,6 +345,39 @@ def create_app(data_file: str | Path | None = None) -> Flask:
 
         return jsonify({"logs": logs})
 
+    @app.get("/code")
+    @require_auth()
+    @limiter.limit("10 per minute")
+    def get_code() -> Any:
+        """
+        Retrieve the 6-character code for authenticated user.
+
+        This allows logged-in users to retrieve their code for setting up
+        sync on additional devices.
+
+        Requires:
+            Authorization: Bearer <token> header
+
+        Returns:
+            JSON: {"code": "ABC123"}
+        """
+        # Get token from Authorization header (already validated by @require_auth)
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]  # "Bearer <token>"
+
+        # Find code associated with this token
+        data = read_data()
+        code = None
+        for entry in data.get("codes", []):
+            if entry.get("token") == token:
+                code = entry["code"]
+                break
+
+        if not code:
+            return jsonify({"error": "Code not found for this token"}), 404
+
+        return jsonify({"code": code})
+
     @app.get("/health")
     def health() -> Any:
         """Health check endpoint for monitoring and container health checks."""

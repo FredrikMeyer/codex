@@ -1,7 +1,7 @@
 // Backend Configuration
 // Allow override via window.backendUrl for testing
 const backendUrl = window.backendUrl || (window.location.hostname === 'localhost'
-  ? 'http://localhost:5000'
+  ? 'http://localhost:5001'  // Use 5001 to avoid macOS AirPlay on port 5000
   : 'https://asthma.fredrikmeyer.net');
 
 // Storage keys
@@ -239,6 +239,7 @@ const generatedCodeDisplay = document.getElementById('generated-code');
 const codeInput = document.getElementById('code-input');
 const completeSetupBtn = document.getElementById('complete-setup');
 const disconnectBtn = document.getElementById('disconnect-sync');
+const showCodeBtn = document.getElementById('show-code');
 
 // Update sync status UI
 function updateSyncStatus() {
@@ -341,6 +342,54 @@ function disconnectSync() {
     clearToken();
     updateSyncStatus();
     toast('Cloud sync disconnected');
+  }
+}
+
+// Show user's 6-character code
+async function showCode() {
+  const token = getToken();
+  if (!token) {
+    toast('Please set up cloud sync first');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${backendUrl}/code`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        toast('Session expired. Please reconnect.');
+        clearToken();
+        updateSyncStatus();
+        return;
+      }
+      throw new Error('Failed to retrieve code');
+    }
+
+    const data = await response.json();
+    const code = data.code;
+
+    // Try to copy to clipboard
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(code);
+        toast(`Your code: ${code} (copied to clipboard!)`);
+      } catch (clipboardError) {
+        // Fallback if clipboard fails
+        toast(`Your code: ${code}`);
+      }
+    } else {
+      // Fallback for browsers without clipboard API
+      toast(`Your code: ${code}`);
+    }
+  } catch (error) {
+    toast('Failed to retrieve code. Check your connection.');
+    console.error('Show code error:', error);
   }
 }
 
@@ -497,6 +546,7 @@ async function syncFromCloud() {
 generateCodeBtn.addEventListener('click', generateCode);
 completeSetupBtn.addEventListener('click', completeSetup);
 disconnectBtn.addEventListener('click', disconnectSync);
+showCodeBtn.addEventListener('click', showCode);
 syncFromCloudBtn.addEventListener('click', syncFromCloud);
 syncToCloudBtn.addEventListener('click', syncToCloud);
 
