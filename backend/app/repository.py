@@ -60,6 +60,29 @@ class LogRepository:
                 if entry.get("code") == code
             ]
 
+    def get_logs_with_metadata(self, code: str) -> List[Dict[str, Any]]:
+        """
+        Retrieve all log entries with metadata for a specific user.
+
+        Args:
+            code: User's authentication code
+
+        Returns:
+            List of entries with 'date', 'spray', 'ventoline', and 'received_at' fields
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            return [
+                {
+                    "date": entry["log"]["date"],
+                    "spray": entry["log"].get("spray", 0),
+                    "ventoline": entry["log"].get("ventoline", 0),
+                    "received_at": entry["received_at"],
+                }
+                for entry in data.get("logs", [])
+                if entry.get("code") == code
+            ]
+
     def code_exists(self, code: str) -> bool:
         """
         Check if a code exists in the system.

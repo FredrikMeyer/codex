@@ -312,6 +312,39 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         log_repository.save_log(code, log)
         return jsonify({"status": "saved"})
 
+    @app.get("/logs")
+    @require_auth()
+    @limiter.limit("100 per minute")
+    def get_logs() -> Any:
+        """
+        Retrieve all log entries for authenticated user.
+
+        Requires:
+            Authorization: Bearer <token> header
+
+        Returns:
+            JSON: {"logs": [{"date", "spray", "ventoline", "received_at"}]}
+        """
+        # Get token from Authorization header (already validated by @require_auth)
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]  # "Bearer <token>"
+
+        # Find code associated with this token
+        data = read_data()
+        code = None
+        for entry in data.get("codes", []):
+            if entry.get("token") == token:
+                code = entry["code"]
+                break
+
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        # Get logs for this user
+        logs = log_repository.get_logs_with_metadata(code)
+
+        return jsonify({"logs": logs})
+
     @app.get("/health")
     def health() -> Any:
         """Health check endpoint for monitoring and container health checks."""

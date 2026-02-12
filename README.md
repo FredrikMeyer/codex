@@ -44,6 +44,18 @@ See [backend/README.md](backend/README.md) for details and [DEPLOY.md](DEPLOY.md
 - ✅ 90 tests with 96.60% coverage
 
 ### Quick Start (Local Development)
+
+**Option 1: Run both frontend and backend together** (recommended)
+```bash
+./dev.sh
+```
+This starts:
+- Backend at http://localhost:5000
+- Frontend at http://localhost:8000
+
+Press `Ctrl+C` to stop both services.
+
+**Option 2: Run backend only**
 ```bash
 cd backend
 uv sync

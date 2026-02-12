@@ -38,6 +38,7 @@ const decBtn = document.getElementById('decrement');
 const saveBtn = document.getElementById('save');
 const resetBtn = document.getElementById('reset-day');
 const exportBtn = document.getElementById('export');
+const syncFromCloudBtn = document.getElementById('sync-from-cloud');
 const syncToCloudBtn = document.getElementById('sync-to-cloud');
 const entriesEl = document.getElementById('entries');
 const toastEl = document.getElementById('toast');
@@ -247,12 +248,14 @@ function updateSyncStatus() {
     syncStatusDot.classList.add('connected');
     syncSetupSection.style.display = 'none';
     syncConfiguredSection.style.display = 'block';
+    syncFromCloudBtn.style.display = 'block';
     syncToCloudBtn.style.display = 'block';
   } else {
     syncStatusText.textContent = 'Not configured';
     syncStatusDot.classList.remove('connected');
     syncSetupSection.style.display = 'block';
     syncConfiguredSection.style.display = 'none';
+    syncFromCloudBtn.style.display = 'none';
     syncToCloudBtn.style.display = 'none';
   }
 }
@@ -411,10 +414,90 @@ async function syncToCloud() {
   }
 }
 
+// Sync entries from cloud
+async function syncFromCloud() {
+  const token = getToken();
+  if (!token) {
+    toast('Please set up cloud sync first');
+    return;
+  }
+
+  try {
+    syncFromCloudBtn.disabled = true;
+    syncFromCloudBtn.textContent = 'Syncing...';
+
+    const response = await fetch(`${backendUrl}/logs`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Token expired. Please reconnect.');
+      }
+      throw new Error('Failed to fetch logs from cloud');
+    }
+
+    const data = await response.json();
+    const cloudLogs = data.logs;
+
+    if (cloudLogs.length === 0) {
+      toast('No data on cloud yet');
+      return;
+    }
+
+    // Merge with local entries
+    let newEntries = 0;
+    let updatedEntries = 0;
+
+    for (const cloudLog of cloudLogs) {
+      const { date, spray, ventoline } = cloudLog;
+      const localEntry = entries[date];
+
+      if (!localEntry) {
+        // New entry from cloud
+        entries[date] = { spray, ventoline };
+        newEntries++;
+      } else {
+        // Entry exists locally
+        // Strategy: Prefer cloud (has timestamp, is persistent)
+        const localSpray = localEntry.spray || 0;
+        const localVentoline = localEntry.ventoline || 0;
+
+        if (localSpray !== spray || localVentoline !== ventoline) {
+          entries[date] = { spray, ventoline };
+          updatedEntries++;
+        }
+      }
+    }
+
+    if (newEntries === 0 && updatedEntries === 0) {
+      toast('Already in sync');
+    } else {
+      saveEntries(entries);
+      render(entries);
+
+      const parts = [];
+      if (newEntries > 0) parts.push(`${newEntries} new`);
+      if (updatedEntries > 0) parts.push(`${updatedEntries} updated`);
+      toast(`✓ Synced ${parts.join(', ')} from cloud`);
+    }
+  } catch (error) {
+    toast(error.message || 'Sync failed. Check your connection.');
+    console.error('Sync from cloud error:', error);
+  } finally {
+    syncFromCloudBtn.disabled = false;
+    syncFromCloudBtn.textContent = 'Sync from Cloud';
+  }
+}
+
 // Event listeners for sync setup
 generateCodeBtn.addEventListener('click', generateCode);
 completeSetupBtn.addEventListener('click', completeSetup);
 disconnectBtn.addEventListener('click', disconnectSync);
+syncFromCloudBtn.addEventListener('click', syncFromCloud);
 syncToCloudBtn.addEventListener('click', syncToCloud);
 
 // Handle Enter key in code input

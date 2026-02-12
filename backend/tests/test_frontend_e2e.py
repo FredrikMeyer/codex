@@ -686,3 +686,74 @@ def test_sync_to_cloud_functionality(page: Page, frontend_url: str, backend_url)
     logs = data.get("logs", [])
     # Should have 2 entries synced
     assert len(logs) >= 2
+
+
+def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backend_url):
+    """Test syncing down entries from cloud to frontend."""
+    backend_base_url, data_file = backend_url
+    page.add_init_script(f"window.backendUrl = '{backend_base_url}';")
+    page.goto(frontend_url)
+
+    # Clear local storage
+    page.evaluate("localStorage.clear()")
+    page.reload()
+
+    # Set up sync (generate code and token)
+    generate_btn = page.locator("#generate-code")
+    generate_btn.click()
+    page.wait_for_timeout(2000)
+
+    code_display = page.locator("#generated-code")
+    code = code_display.text_content()
+    assert code is not None
+
+    code_input = page.locator("#code-input")
+    code_input.fill(code)
+
+    complete_btn = page.locator("#complete-setup")
+    complete_btn.click()
+    page.wait_for_timeout(2000)
+
+    # Verify both sync buttons are visible
+    sync_from_cloud_btn = page.locator("#sync-from-cloud")
+    sync_to_cloud_btn = page.locator("#sync-to-cloud")
+    expect(sync_from_cloud_btn).to_be_visible()
+    expect(sync_to_cloud_btn).to_be_visible()
+
+    # Upload entry to cloud first (simulate data from another device)
+    page.evaluate("document.getElementById('usage-date').valueAsDate = new Date('2026-02-14')")
+    increment_btn = page.locator("#increment")
+    increment_btn.click()
+    increment_btn.click()
+
+    save_btn = page.locator("#save")
+    save_btn.click()
+    page.wait_for_timeout(500)
+
+    sync_to_cloud_btn.click()
+    page.wait_for_timeout(2000)
+
+    # Clear local storage to simulate new device
+    page.evaluate("localStorage.removeItem('asthma-usage-entries')")
+    page.reload()
+
+    # Verify no entries locally
+    entries_before = page.locator(".entry")
+    expect(entries_before).to_have_count(0)
+
+    # Sync from cloud
+    sync_from_cloud_btn.click()
+    page.wait_for_timeout(2000)
+
+    # Verify success toast
+    toast = page.locator("#toast")
+    expect(toast).to_contain_text("Synced", timeout=5000)
+
+    # Verify entry downloaded from cloud
+    entries_after = page.locator(".entry")
+    expect(entries_after).to_have_count(1)
+
+    # Verify entry data is correct
+    entry = entries_after.first
+    expect(entry).to_contain_text("2026-02-14")
+    expect(entry).to_contain_text("2 doses")
