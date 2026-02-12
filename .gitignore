@@ -3,4 +3,5 @@ __pycache__/
 .venv/
 backend/data/storage.json
 backend/test_screenshots/
+backend/.env.local
 garmindb.log

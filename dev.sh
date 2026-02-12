@@ -54,14 +54,25 @@ fi
 # Start backend
 echo -e "${YELLOW}Starting backend...${NC}"
 cd backend
-uv run flask --app app.main run --debug --port 5000 > /tmp/codex-backend.log 2>&1 &
+
+# Load local development environment variables if they exist
+if [ -f .env.local ]; then
+  export $(grep -v '^#' .env.local | xargs)
+  echo -e "${YELLOW}Loaded .env.local${NC}"
+else
+  # Set default ALLOWED_ORIGINS for local development
+  export ALLOWED_ORIGINS="http://localhost:8000"
+fi
+
+# Use port 5001 instead of 5000 (macOS uses 5000 for AirPlay)
+uv run flask --app app.main run --debug --port 5001 > /tmp/codex-backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
 
 # Wait for backend to start
 echo -e "${YELLOW}Waiting for backend to be ready...${NC}"
 for i in {1..30}; do
-  if curl -s http://localhost:5000/health > /dev/null 2>&1; then
+  if curl -s http://localhost:5001/health > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Backend ready!${NC}"
     break
   fi
@@ -84,7 +95,9 @@ echo -e "${GREEN}✓ Development servers running!${NC}"
 echo -e "${GREEN}════════════════════════════════════${NC}"
 echo ""
 echo -e "${BLUE}Frontend:${NC} http://localhost:8000"
-echo -e "${BLUE}Backend:${NC}  http://localhost:5000"
+echo -e "${BLUE}Backend:${NC}  http://localhost:5001"
+echo ""
+echo -e "${YELLOW}Note:${NC} Using port 5001 (macOS uses 5000 for AirPlay)"
 echo ""
 echo -e "${YELLOW}Logs:${NC}"
 echo -e "  Backend:  tail -f /tmp/codex-backend.log"

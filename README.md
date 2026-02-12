@@ -50,8 +50,10 @@ See [backend/README.md](backend/README.md) for details and [DEPLOY.md](DEPLOY.md
 ./dev.sh
 ```
 This starts:
-- Backend at http://localhost:5000
+- Backend at http://localhost:5001
 - Frontend at http://localhost:8000
+
+**Note**: Port 5001 is used for the backend because macOS uses port 5000 for AirPlay.
 
 Press `Ctrl+C` to stop both services.
 

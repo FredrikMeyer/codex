@@ -9,8 +9,10 @@ Start both backend and frontend servers with a single command:
 ```
 
 This will start:
-- **Backend (Flask)**: http://localhost:5000
+- **Backend (Flask)**: http://localhost:5001
 - **Frontend (Static Server)**: http://localhost:8000
+
+**Note**: We use port 5001 for the backend because macOS uses port 5000 for AirPlay Receiver.
 
 Press `Ctrl+C` to stop both services.
 
@@ -42,7 +44,8 @@ tail -f /tmp/codex-frontend.log
 ```bash
 cd backend
 uv sync                              # Install dependencies
-uv run flask --app app.main run --debug --port 5000
+export ALLOWED_ORIGINS="http://localhost:8000"  # Enable CORS for local frontend
+uv run flask --app app.main run --debug --port 5001
 ```
 
 ### Frontend only
@@ -72,12 +75,12 @@ This runs:
 
 ### Backend
 
-The frontend automatically detects localhost and uses `http://localhost:5000` as the backend URL.
+The frontend automatically detects localhost and uses `http://localhost:5001` as the backend URL.
 
 For production, the backend URL is configured in `frontend/app.js`:
 ```javascript
 const backendUrl = window.backendUrl || (window.location.hostname === 'localhost'
-  ? 'http://localhost:5000'
+  ? 'http://localhost:5001'
   : 'https://asthma.fredrikmeyer.net');
 ```
 
@@ -102,21 +105,39 @@ DATA_FILE=/tmp/codex-data.json
 If you get "Address already in use" errors:
 
 ```bash
-# Find process using port 5000
-lsof -i :5000
+# Find process using port 5001 (backend)
+lsof -i :5001
 
-# Kill it
+# Find process using port 8000 (frontend)
+lsof -i :8000
+
+# Kill specific process
 kill -9 <PID>
 
 # Or kill all Flask processes
 pkill -f "flask --app app.main"
+
+# Or kill all Python HTTP servers
+pkill -f "python3 -m http.server"
 ```
+
+**Note**: macOS uses port 5000 for AirPlay Receiver. If you see "AirTunes" errors, make sure you're using port 5001 for the backend.
 
 ### Frontend can't reach backend
 
-1. Check backend is running: `curl http://localhost:5000/health`
+1. Check backend is running: `curl http://localhost:5001/health`
 2. Check browser console for CORS errors
 3. Verify `backendUrl` in frontend/app.js
+4. Check CORS configuration:
+   ```bash
+   # Test CORS headers
+   curl -i -H "Origin: http://localhost:8000" http://localhost:5001/health | grep Access-Control
+
+   # Should show:
+   # Access-Control-Allow-Origin: http://localhost:8000
+   # Access-Control-Allow-Credentials: true
+   ```
+5. Ensure `ALLOWED_ORIGINS` is set correctly (dev.sh does this automatically)
 
 ### uv not found
 
@@ -149,18 +170,18 @@ Test endpoints with curl:
 
 ```bash
 # Generate code
-curl -X POST http://localhost:5000/generate-code
+curl -X POST http://localhost:5001/generate-code
 
 # Health check
-curl http://localhost:5000/health
+curl http://localhost:5001/health
 
 # Save log (requires authentication)
-curl -X POST http://localhost:5000/logs \
+curl -X POST http://localhost:5001/logs \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"log": {"date": "2026-02-12", "spray": 2, "ventoline": 1}}'
 
 # Get logs (requires authentication)
-curl http://localhost:5000/logs \
+curl http://localhost:5001/logs \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
