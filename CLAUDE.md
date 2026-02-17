@@ -347,6 +347,9 @@ When refactoring low-cohesion logic (scattered, duplicated), consider two approa
 ## File Conventions
 - **No copyright headers**: Do not add copyright headers to new files - they are added automatically by the build
 
+## Frontend Changes
+- **Always update the cache key** when making frontend changes to ensure users receive the latest assets
+
 ## General Preferences
 - British English with Oxford spelling preferred
 
