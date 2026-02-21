@@ -77,7 +77,6 @@ class LogRepository:
                     "date": entry["log"]["date"],
                     "spray": entry["log"].get("spray", 0),
                     "ventoline": entry["log"].get("ventoline", 0),
-                    "preventive": entry["log"].get("preventive", False),
                     "received_at": entry["received_at"],
                 }
                 for entry in data.get("logs", [])
