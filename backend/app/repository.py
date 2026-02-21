@@ -83,6 +83,58 @@ class LogRepository:
                 if entry.get("code") == code
             ]
 
+    def save_event(self, code: str, event_data: Dict[str, Any]) -> None:
+        """
+        Save a usage event for a user, skipping if the same id already exists.
+
+        Args:
+            code: User's authentication code
+            event_data: The event data (id, date, timestamp, type, count, preventive)
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            event_id = event_data.get("id")
+            if event_id:
+                existing_ids = {
+                    entry["event"].get("id")
+                    for entry in data.get("events", [])
+                    if entry.get("code") == code
+                }
+                if event_id in existing_ids:
+                    return
+            data.setdefault("events", []).append({
+                "code": code,
+                "event": event_data,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            })
+            save_data(self.data_file, data)
+
+    def get_events(self, code: str) -> List[Dict[str, Any]]:
+        """
+        Retrieve all usage events for a user.
+
+        Args:
+            code: User's authentication code
+
+        Returns:
+            List of events with id, date, timestamp, type, count, preventive, received_at
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            return [
+                {
+                    "id": entry["event"]["id"],
+                    "date": entry["event"]["date"],
+                    "timestamp": entry["event"]["timestamp"],
+                    "type": entry["event"]["type"],
+                    "count": entry["event"]["count"],
+                    "preventive": entry["event"].get("preventive", False),
+                    "received_at": entry["received_at"],
+                }
+                for entry in data.get("events", [])
+                if entry.get("code") == code
+            ]
+
     def code_exists(self, code: str) -> bool:
         """
         Check if a code exists in the system.
