@@ -350,6 +350,19 @@ When refactoring low-cohesion logic (scattered, duplicated), consider two approa
 ## Frontend Changes
 - **Always update the cache key** when making frontend changes to ensure users receive the latest assets
 
+## Code Exploration with ast-grep
+Use `sg` (ast-grep) for structural code search. Unlike text-based grep, it understands syntax and can match code patterns across a codebase.
+
+```bash
+# Find all calls to a method
+sg -p 'someMethod($$$)' --lang java
+
+# Find all usages of a specific pattern
+sg -p 'new $TYPE($$$)' --lang java
+```
+
+Prefer `sg` over `grep` when searching for code patterns where structure matters (method calls, class usages, expression shapes).
+
 ## General Preferences
 - British English with Oxford spelling preferred
 
