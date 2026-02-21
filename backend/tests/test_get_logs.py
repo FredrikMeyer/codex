@@ -111,6 +111,53 @@ def test_get_logs_excludes_other_users(auth_token):
     assert data["logs"][0]["date"] == "2026-02-12"
 
 
+def test_post_log_with_preventive_true_is_saved_and_returned(auth_token):
+    """POST /logs with preventive:true saves the flag and GET /logs returns it."""
+    test_client, _, code, token = auth_token
+
+    test_client.post(
+        "/logs",
+        json={"code": code, "log": {"date": "2026-02-20", "spray": 2, "ventoline": 0, "preventive": True}},
+    )
+
+    response = test_client.get("/logs", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    logs = response.get_json()["logs"]
+    assert len(logs) == 1
+    assert logs[0]["preventive"] is True
+
+
+def test_post_log_without_preventive_defaults_to_false(auth_token):
+    """POST /logs without preventive field returns False for preventive in GET /logs."""
+    test_client, _, code, token = auth_token
+
+    test_client.post(
+        "/logs",
+        json={"code": code, "log": {"date": "2026-02-20", "spray": 1, "ventoline": 0}},
+    )
+
+    response = test_client.get("/logs", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    logs = response.get_json()["logs"]
+    assert len(logs) == 1
+    assert logs[0]["preventive"] is False
+
+
+def test_get_logs_includes_preventive_field(auth_token):
+    """GET /logs always includes the preventive field in each log entry."""
+    test_client, _, code, token = auth_token
+
+    test_client.post(
+        "/logs",
+        json={"code": code, "log": {"date": "2026-02-20", "ventoline": 2}},
+    )
+
+    response = test_client.get("/logs", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    log = response.get_json()["logs"][0]
+    assert "preventive" in log
+
+
 def test_get_logs_rate_limiting(auth_token):
     """Rate limiting applies to GET /logs."""
     test_client, _, _, token = auth_token

@@ -52,9 +52,9 @@ let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
 function normalizeEntry(value) {
   if (typeof value === 'number') {
     // Old format: just a number → treat as ventoline (not spray)
-    return { spray: 0, ventoline: value };
+    return { spray: 0, ventoline: value, preventive: false };
   }
-  return { spray: value.spray || 0, ventoline: value.ventoline || 0 };
+  return { spray: value.spray || 0, ventoline: value.ventoline || 0, preventive: value.preventive || false };
 }
 
 function loadEntries() {
@@ -112,10 +112,22 @@ function render(entries) {
     const breakdown = [];
     if (normalized.spray > 0) breakdown.push(`Spray: ${normalized.spray}`);
     if (normalized.ventoline > 0) breakdown.push(`Ventoline: ${normalized.ventoline}`);
+    if (normalized.preventive) breakdown.push('Exercise');
     const countText = breakdown.length > 0
       ? `${total} doses <span class="breakdown">(${breakdown.join(', ')})</span>`
       : `${total} doses`;
     item.innerHTML = `<div><div class="date">${date}</div><div class="count">${countText}</div></div>`;
+    const preventiveBtn = document.createElement('button');
+    preventiveBtn.textContent = normalized.preventive ? 'Exercise ✓' : 'Exercise';
+    preventiveBtn.className = 'ghost';
+    preventiveBtn.addEventListener('click', () => {
+      const current = normalizeEntry(entries[date]);
+      current.preventive = !current.preventive;
+      entries[date] = current;
+      saveEntries(entries);
+      render(entries);
+    });
+    item.appendChild(preventiveBtn);
     const del = document.createElement('button');
     del.textContent = 'Delete';
     del.className = 'ghost';
@@ -201,7 +213,7 @@ saveBtn.addEventListener('click', () => {
 
 resetBtn.addEventListener('click', () => {
   const dateKey = formatDate(usageDate.value);
-  entries[dateKey] = { spray: 0, ventoline: 0 };
+  entries[dateKey] = { spray: 0, ventoline: 0, preventive: false };
   updateCount(0);
   saveEntries(entries);
   render(entries);
@@ -211,11 +223,11 @@ resetBtn.addEventListener('click', () => {
 exportBtn.addEventListener('click', () => {
   const dates = Object.keys(entries).sort();
   const rows = [
-    ['date', 'spray', 'ventoline', 'total'],
+    ['date', 'spray', 'ventoline', 'total', 'preventive'],
     ...dates.map((d) => {
       const normalized = normalizeEntry(entries[d]);
       const total = normalized.spray + normalized.ventoline;
-      return [d, normalized.spray, normalized.ventoline, total];
+      return [d, normalized.spray, normalized.ventoline, total, normalized.preventive ? 'true' : 'false'];
     })
   ];
   const csv = rows.map((r) => r.join(',')).join('\n');
@@ -429,7 +441,8 @@ async function syncToCloud() {
             log: {
               date: date,
               spray: entry.spray,
-              ventoline: entry.ventoline
+              ventoline: entry.ventoline,
+              preventive: entry.preventive || false
             }
           })
         });
@@ -502,12 +515,12 @@ async function syncFromCloud() {
     let updatedEntries = 0;
 
     for (const cloudLog of cloudLogs) {
-      const { date, spray, ventoline } = cloudLog;
+      const { date, spray, ventoline, preventive } = cloudLog;
       const localEntry = entries[date];
 
       if (!localEntry) {
         // New entry from cloud
-        entries[date] = { spray, ventoline };
+        entries[date] = { spray, ventoline, preventive: preventive || false };
         newEntries++;
       } else {
         // Entry exists locally
@@ -515,8 +528,8 @@ async function syncFromCloud() {
         const localSpray = localEntry.spray || 0;
         const localVentoline = localEntry.ventoline || 0;
 
-        if (localSpray !== spray || localVentoline !== ventoline) {
-          entries[date] = { spray, ventoline };
+        if (localSpray !== spray || localVentoline !== ventoline || (localEntry.preventive || false) !== (preventive || false)) {
+          entries[date] = { spray, ventoline, preventive: preventive || false };
           updatedEntries++;
         }
       }

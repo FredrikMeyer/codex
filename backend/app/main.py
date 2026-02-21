@@ -28,6 +28,7 @@ class LogEntry(BaseModel):
     date: str = Field(..., description="Date in YYYY-MM-DD format")
     spray: Optional[int] = Field(None, ge=0, description="Spray doses (non-negative)")
     ventoline: Optional[int] = Field(None, ge=0, description="Ventoline doses (non-negative)")
+    preventive: Optional[bool] = Field(None, description="Whether this usage was preventive-related")
 
     @field_validator("date")
     @classmethod

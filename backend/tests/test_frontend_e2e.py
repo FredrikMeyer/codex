@@ -321,7 +321,7 @@ def test_delete_entry(page: Page, frontend_url: str):
     expect(entries).to_have_count(1)
 
     # Click delete button
-    delete_btn = entries.first.locator("button.ghost")
+    delete_btn = entries.first.get_by_role("button", name="Delete")
     delete_btn.click()
 
     # Entry should be removed
