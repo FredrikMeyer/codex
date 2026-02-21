@@ -757,3 +757,99 @@ def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backen
     entry = entries_after.first
     expect(entry).to_contain_text("2026-02-14")
     expect(entry).to_contain_text("2 doses")
+
+
+# --- Migration tests ---
+
+def test_v2_migration_converts_old_date_keyed_format(page: Page, frontend_url: str):
+    """Old date-keyed object is converted to event array and displayed correctly."""
+    page.goto(frontend_url)
+    page.evaluate("localStorage.clear()")
+
+    # Inject old-format data (date-keyed object)
+    old_data = '{"2026-01-10": {"spray": 2, "ventoline": 1}}'
+    page.evaluate(f"localStorage.setItem('asthma-usage-entries', '{old_data}')")
+    page.reload()
+
+    entries = page.locator(".entry")
+    expect(entries).to_have_count(1)
+    expect(entries.first).to_contain_text("2026-01-10")
+    expect(entries.first).to_contain_text("3 doses")
+    expect(entries.first).to_contain_text("Spray: 2")
+    expect(entries.first).to_contain_text("Ventoline: 1")
+
+
+def test_v2_migration_converts_old_number_format(page: Page, frontend_url: str):
+    """Very old number-only format is converted: number treated as ventoline."""
+    page.goto(frontend_url)
+    page.evaluate("localStorage.clear()")
+
+    old_data = '{"2026-01-15": 3}'
+    page.evaluate(f"localStorage.setItem('asthma-usage-entries', '{old_data}')")
+    page.reload()
+
+    entries = page.locator(".entry")
+    expect(entries).to_have_count(1)
+    expect(entries.first).to_contain_text("3 doses")
+    expect(entries.first).to_contain_text("Ventoline: 3")
+
+
+def test_v2_migration_only_runs_once(page: Page, frontend_url: str):
+    """Migration is idempotent: running it again does not duplicate events."""
+    page.goto(frontend_url)
+    page.evaluate("localStorage.clear()")
+
+    old_data = '{"2026-01-20": {"spray": 0, "ventoline": 2}}'
+    page.evaluate(f"localStorage.setItem('asthma-usage-entries', '{old_data}')")
+    page.reload()
+
+    # Reload a second time — migration should not run again
+    page.reload()
+
+    entries = page.locator(".entry")
+    expect(entries).to_have_count(1)
+    expect(entries.first).to_contain_text("2 doses")
+
+
+def test_v2_migration_stores_data_as_array(page: Page, frontend_url: str):
+    """After migration, localStorage contains a JSON array."""
+    page.goto(frontend_url)
+    page.evaluate("localStorage.clear()")
+
+    old_data = '{"2026-01-25": {"spray": 1, "ventoline": 0}}'
+    page.evaluate(f"localStorage.setItem('asthma-usage-entries', '{old_data}')")
+    page.reload()
+
+    raw = page.evaluate("localStorage.getItem('asthma-usage-entries')")
+    import json
+    parsed = json.loads(raw)
+    assert isinstance(parsed, list)
+    assert len(parsed) == 1
+    event = parsed[0]
+    assert event["type"] == "spray"
+    assert event["count"] == 1
+    assert event["date"] == "2026-01-25"
+    assert "id" in event
+    assert "timestamp" in event
+
+
+def test_existing_event_array_is_not_modified_by_migration(page: Page, frontend_url: str):
+    """Data already in event-array format passes through migration unchanged."""
+    page.goto(frontend_url)
+    page.evaluate("localStorage.clear()")
+
+    # Pre-set the migration flag to simulate already-migrated state
+    page.evaluate("localStorage.setItem('asthma-migrated-v2', 'true')")
+
+    import json
+    existing_events = json.dumps([
+        {"id": "test-id-1", "date": "2026-01-30", "timestamp": "2026-01-30T10:00:00.000Z",
+         "type": "ventoline", "count": 2, "preventive": False}
+    ])
+    page.evaluate(f"localStorage.setItem('asthma-usage-entries', '{existing_events}')")
+    page.reload()
+
+    entries = page.locator(".entry")
+    expect(entries).to_have_count(1)
+    expect(entries.first).to_contain_text("2026-01-30")
+    expect(entries.first).to_contain_text("2 doses")

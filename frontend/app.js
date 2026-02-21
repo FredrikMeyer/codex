@@ -49,57 +49,80 @@ usageDate.valueAsDate = today;
 
 let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
 
-function normalizeEntry(value) {
-  if (typeof value === 'number') {
-    // Old format: just a number → treat as ventoline (not spray)
-    return { spray: 0, ventoline: value };
+function generateId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
-  return { spray: value.spray || 0, ventoline: value.ventoline || 0 };
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+function createTimestamp(dateValue) {
+  const today = new Date().toISOString().slice(0, 10);
+  return dateValue === today ? new Date().toISOString() : dateValue + 'T12:00:00.000Z';
+}
+
+function getEventsForDate(events, date) {
+  return events.filter((e) => e.date === date);
+}
+
+function sumForType(events, date, type) {
+  return getEventsForDate(events, date)
+    .filter((e) => e.type === type)
+    .reduce((sum, e) => sum + e.count, 0);
 }
 
 function loadEntries() {
   const raw = localStorage.getItem(storageKey);
   try {
-    return raw ? JSON.parse(raw) : {};
+    return raw ? JSON.parse(raw) : [];
   } catch (_) {
-    return {};
+    return [];
   }
 }
 
-// One-time migration: flip old entries from spray→ventoline
-function migrateOldData(entries) {
-  const migrationKey = 'asthma-migrated-v1';
+// One-time migration: convert old date-keyed format to flat event array
+function migrateToEventLog(data) {
+  const migrationKey = 'asthma-migrated-v2';
   if (localStorage.getItem(migrationKey)) {
-    return entries; // Already migrated
+    return data;
   }
 
-  const migrated = {};
-  for (const [date, value] of Object.entries(entries)) {
-    const normalized = normalizeEntry(value);
-    // If entry has ONLY spray (no ventoline), flip it
-    if (normalized.spray > 0 && normalized.ventoline === 0) {
-      migrated[date] = { spray: 0, ventoline: normalized.spray };
-    } else {
-      migrated[date] = normalized;
+  // Already an array means nothing to convert
+  if (Array.isArray(data)) {
+    localStorage.setItem(migrationKey, 'true');
+    return data;
+  }
+
+  // Convert date-keyed object to event array
+  const events = [];
+  for (const [date, value] of Object.entries(data)) {
+    let spray = 0;
+    let ventoline = 0;
+    if (typeof value === 'number') {
+      ventoline = value;
+    } else if (value && typeof value === 'object') {
+      spray = value.spray || 0;
+      ventoline = value.ventoline || 0;
+    }
+    if (spray > 0) {
+      events.push({ id: generateId(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
+    }
+    if (ventoline > 0) {
+      events.push({ id: generateId(), date, timestamp: date + 'T12:00:01.000Z', type: 'ventoline', count: ventoline, preventive: false });
     }
   }
 
   localStorage.setItem(migrationKey, 'true');
-  return migrated;
-}
-
-function getEntryForDate(entries, date) {
-  const entry = entries[date];
-  return entry ? normalizeEntry(entry) : { spray: 0, ventoline: 0 };
+  return events;
 }
 
 function saveEntries(entries) {
   localStorage.setItem(storageKey, JSON.stringify(entries));
 }
 
-function render(entries) {
+function render(events) {
   entriesEl.innerHTML = '';
-  const dates = Object.keys(entries).sort((a, b) => new Date(b) - new Date(a));
+  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => new Date(b) - new Date(a));
   if (!dates.length) {
     entriesEl.innerHTML = '<div class="hint">No history yet. Save your first day.</div>';
     return;
@@ -107,11 +130,12 @@ function render(entries) {
   for (const date of dates) {
     const item = document.createElement('div');
     item.className = 'entry';
-    const normalized = normalizeEntry(entries[date]);
-    const total = normalized.spray + normalized.ventoline;
+    const sprayTotal = sumForType(events, date, 'spray');
+    const ventolineTotal = sumForType(events, date, 'ventoline');
+    const total = sprayTotal + ventolineTotal;
     const breakdown = [];
-    if (normalized.spray > 0) breakdown.push(`Spray: ${normalized.spray}`);
-    if (normalized.ventoline > 0) breakdown.push(`Ventoline: ${normalized.ventoline}`);
+    if (sprayTotal > 0) breakdown.push(`Spray: ${sprayTotal}`);
+    if (ventolineTotal > 0) breakdown.push(`Ventoline: ${ventolineTotal}`);
     const countText = breakdown.length > 0
       ? `${total} doses <span class="breakdown">(${breakdown.join(', ')})</span>`
       : `${total} doses`;
@@ -120,7 +144,7 @@ function render(entries) {
     del.textContent = 'Delete';
     del.className = 'ghost';
     del.addEventListener('click', () => {
-      delete entries[date];
+      entries = entries.filter((e) => e.date !== date);
       saveEntries(entries);
       render(entries);
       toast('Entry removed');
@@ -146,12 +170,11 @@ function updateCount(value) {
 
 function updateCountForCurrentSelection() {
   const dateKey = formatDate(usageDate.value);
-  const entry = getEntryForDate(entries, dateKey);
-  updateCount(entry[selectedMedicineType]);
+  updateCount(sumForType(entries, dateKey, selectedMedicineType));
 }
 
 let entries = loadEntries();
-entries = migrateOldData(entries);
+entries = migrateToEventLog(entries);
 saveEntries(entries); // Save migrated data
 
 // Set active medicine type button based on stored preference
@@ -190,9 +213,11 @@ usageDate.addEventListener('change', () => {
 
 saveBtn.addEventListener('click', () => {
   const dateKey = formatDate(usageDate.value);
-  const entry = getEntryForDate(entries, dateKey);
-  entry[selectedMedicineType] = Number(countEl.textContent) || 0;
-  entries[dateKey] = entry;
+  const newCount = Number(countEl.textContent) || 0;
+  entries = entries.filter((e) => !(e.date === dateKey && e.type === selectedMedicineType));
+  if (newCount > 0) {
+    entries.push({ id: generateId(), date: dateKey, timestamp: createTimestamp(dateKey), type: selectedMedicineType, count: newCount, preventive: false });
+  }
   saveEntries(entries);
   localStorage.setItem(lastTypeKey, selectedMedicineType);
   render(entries);
@@ -201,7 +226,7 @@ saveBtn.addEventListener('click', () => {
 
 resetBtn.addEventListener('click', () => {
   const dateKey = formatDate(usageDate.value);
-  entries[dateKey] = { spray: 0, ventoline: 0 };
+  entries = entries.filter((e) => e.date !== dateKey);
   updateCount(0);
   saveEntries(entries);
   render(entries);
@@ -209,13 +234,13 @@ resetBtn.addEventListener('click', () => {
 });
 
 exportBtn.addEventListener('click', () => {
-  const dates = Object.keys(entries).sort();
+  const dates = [...new Set(entries.map((e) => e.date))].sort();
   const rows = [
     ['date', 'spray', 'ventoline', 'total'],
     ...dates.map((d) => {
-      const normalized = normalizeEntry(entries[d]);
-      const total = normalized.spray + normalized.ventoline;
-      return [d, normalized.spray, normalized.ventoline, total];
+      const spray = sumForType(entries, d, 'spray');
+      const ventoline = sumForType(entries, d, 'ventoline');
+      return [d, spray, ventoline, spray + ventoline];
     })
   ];
   const csv = rows.map((r) => r.join(',')).join('\n');
@@ -401,7 +426,7 @@ async function syncToCloud() {
     return;
   }
 
-  const dates = Object.keys(entries);
+  const dates = [...new Set(entries.map((e) => e.date))];
   if (dates.length === 0) {
     toast('No entries to sync');
     return;
@@ -414,9 +439,10 @@ async function syncToCloud() {
     let successCount = 0;
     let errorCount = 0;
 
-    // Send each entry to the backend
+    // Send each day's aggregated counts to the backend
     for (const date of dates) {
-      const entry = normalizeEntry(entries[date]);
+      const spray = sumForType(entries, date, 'spray');
+      const ventoline = sumForType(entries, date, 'ventoline');
 
       try {
         const response = await fetch(`${backendUrl}/logs`, {
@@ -427,9 +453,9 @@ async function syncToCloud() {
           },
           body: JSON.stringify({
             log: {
-              date: date,
-              spray: entry.spray,
-              ventoline: entry.ventoline
+              date,
+              spray,
+              ventoline
             }
           })
         });
@@ -503,22 +529,29 @@ async function syncFromCloud() {
 
     for (const cloudLog of cloudLogs) {
       const { date, spray, ventoline } = cloudLog;
-      const localEntry = entries[date];
+      const localSpray = sumForType(entries, date, 'spray');
+      const localVentoline = sumForType(entries, date, 'ventoline');
+      const hasLocalEvents = getEventsForDate(entries, date).length > 0;
 
-      if (!localEntry) {
-        // New entry from cloud
-        entries[date] = { spray, ventoline };
-        newEntries++;
-      } else {
-        // Entry exists locally
-        // Strategy: Prefer cloud (has timestamp, is persistent)
-        const localSpray = localEntry.spray || 0;
-        const localVentoline = localEntry.ventoline || 0;
-
-        if (localSpray !== spray || localVentoline !== ventoline) {
-          entries[date] = { spray, ventoline };
-          updatedEntries++;
+      if (!hasLocalEvents) {
+        // New entry from cloud — synthesise events
+        if (spray > 0) {
+          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
         }
+        if (ventoline > 0) {
+          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:01.000Z', type: 'ventoline', count: ventoline, preventive: false });
+        }
+        newEntries++;
+      } else if (localSpray !== spray || localVentoline !== ventoline) {
+        // Cloud differs — replace local events for this date
+        entries = entries.filter((e) => e.date !== date);
+        if (spray > 0) {
+          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
+        }
+        if (ventoline > 0) {
+          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:01.000Z', type: 'ventoline', count: ventoline, preventive: false });
+        }
+        updatedEntries++;
       }
     }
 
