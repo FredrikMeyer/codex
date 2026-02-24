@@ -55,3 +55,25 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | while read tag; do
             echo "  - $tag"
           done
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          tags: tag:github-actions
+
+      - name: Deploy via SSH
+        run: |
+          install -m 600 /dev/null /tmp/deploy_key
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > /tmp/deploy_key
+          ssh -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            fredrik@forgottensuperhero \
+            'cd /var/www/codex/backend && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d'
+          rm /tmp/deploy_key

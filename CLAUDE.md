@@ -341,7 +341,7 @@ When refactoring low-cohesion logic (scattered, duplicated), consider two approa
 
 ## Git Commit Messages
 - Use conventional commits (feat:, fix:, docs:, etc.)
-- Omit Claude Code attribution footer
+- Omit Claude Code attribution footer — do NOT add any Co-Authored-By lines
 - Keep first line under 50 chars
 
 ## File Conventions
