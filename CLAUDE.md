@@ -13,6 +13,7 @@ After making any code changes, ALWAYS run `./test.sh` before considering the wor
 - Tests must pass before proceeding to the next step
 - If tests fail, fix the issues before moving on
 - Never skip this step, even for "simple" changes
+- ALWAYS run the full test suite before finishing a task or making the final commit
 
 ## Single Responsibility
 You strive to make classes do one thing and do it well. We clearly state the responsibility of the class in the 
