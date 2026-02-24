@@ -759,6 +759,55 @@ def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backen
     expect(entry).to_contain_text("2 doses")
 
 
+def test_clear_local_data_removes_entries(page: Page, frontend_url: str, backend_url):
+    """Clear local data button wipes entries but keeps sync token."""
+    backend_base_url, _ = backend_url
+    page.add_init_script(f"window.backendUrl = '{backend_base_url}';")
+    page.goto(frontend_url)
+
+    page.evaluate("localStorage.clear()")
+    page.reload()
+
+    # Set up sync so the clear button is visible
+    generate_btn = page.locator("#generate-code")
+    generate_btn.click()
+    page.wait_for_timeout(2000)
+
+    code = page.locator("#generated-code").text_content()
+    page.locator("#code-input").fill(code)
+    page.locator("#complete-setup").click()
+    page.wait_for_timeout(2000)
+
+    # Save a couple of entries
+    increment_btn = page.locator("#increment")
+    save_btn = page.locator("#save")
+
+    increment_btn.click()
+    save_btn.click()
+    page.wait_for_timeout(300)
+
+    page.evaluate("document.getElementById('usage-date').valueAsDate = new Date('2026-02-10')")
+    increment_btn.click()
+    save_btn.click()
+    page.wait_for_timeout(300)
+
+    expect(page.locator(".entry")).to_have_count(2)
+
+    # Click clear local data and confirm
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.locator("#clear-local-data").click()
+    page.wait_for_timeout(300)
+
+    # Entries should be gone
+    expect(page.locator(".entry")).to_have_count(0)
+
+    # Toast confirms the action
+    expect(page.locator("#toast")).to_contain_text("Local data cleared")
+
+    # Token should still be present (sync stays configured)
+    expect(page.locator("#sync-status-text")).to_contain_text("Connected")
+
+
 # --- Migration tests ---
 
 def test_v2_migration_converts_old_date_keyed_format(page: Page, frontend_url: str):
