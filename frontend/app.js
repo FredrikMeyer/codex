@@ -522,17 +522,45 @@ async function syncFromCloud() {
     }
 
     const localIds = new Set(entries.map((e) => e.id));
-    const newEvents = cloudEvents.filter((e) => !localIds.has(e.id));
+    const unmatched = cloudEvents.filter((e) => !localIds.has(e.id));
 
-    if (newEvents.length === 0) {
+    if (unmatched.length === 0) {
       toast('Already in sync');
       return;
     }
 
-    entries = [...entries, ...newEvents];
+    // For each unmatched cloud event, check if a functionally equivalent
+    // local event exists (same date/type/count/preventive but different ID).
+    // If so, update the local ID to the cloud ID to align future syncs.
+    // Otherwise treat it as genuinely new.
+    const matchedLocalIndices = new Set();
+    const trulyNew = [];
+
+    for (const cloudEvent of unmatched) {
+      const localIdx = entries.findIndex(
+        (e, i) => !matchedLocalIndices.has(i) &&
+                   e.date === cloudEvent.date &&
+                   e.type === cloudEvent.type &&
+                   e.count === cloudEvent.count &&
+                   Boolean(e.preventive) === Boolean(cloudEvent.preventive)
+      );
+      if (localIdx !== -1) {
+        matchedLocalIndices.add(localIdx);
+        entries[localIdx] = { ...entries[localIdx], id: cloudEvent.id };
+      } else {
+        trulyNew.push(cloudEvent);
+      }
+    }
+
+    entries = [...entries, ...trulyNew];
     saveEntries(entries);
     render(entries);
-    toast(`✓ Synced ${newEvents.length} new ${newEvents.length === 1 ? 'event' : 'events'} from cloud`);
+
+    if (trulyNew.length > 0) {
+      toast(`✓ Synced ${trulyNew.length} new ${trulyNew.length === 1 ? 'event' : 'events'} from cloud`);
+    } else {
+      toast('Already in sync');
+    }
   } catch (error) {
     toast(error.message || 'Sync failed. Check your connection.');
     console.error('Sync from cloud error:', error);
