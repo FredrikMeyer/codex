@@ -274,6 +274,7 @@ const generatedCodeDisplay = document.getElementById('generated-code');
 const codeInput = document.getElementById('code-input');
 const completeSetupBtn = document.getElementById('complete-setup');
 const disconnectBtn = document.getElementById('disconnect-sync');
+const clearLocalDataBtn = document.getElementById('clear-local-data');
 const showCodeBtn = document.getElementById('show-code');
 
 // Update sync status UI
@@ -368,6 +369,17 @@ async function completeSetup() {
   } finally {
     completeSetupBtn.disabled = false;
     completeSetupBtn.textContent = 'Complete Setup';
+  }
+}
+
+// Clear all local data (keeps token/sync config intact)
+function clearLocalData() {
+  if (confirm('Clear all local data on this device? Your cloud data is unaffected. You can sync it back afterwards.')) {
+    entries = [];
+    saveEntries(entries);
+    render(entries);
+    updateCount(0);
+    toast('Local data cleared');
   }
 }
 
@@ -574,6 +586,7 @@ async function syncFromCloud() {
 generateCodeBtn.addEventListener('click', generateCode);
 completeSetupBtn.addEventListener('click', completeSetup);
 disconnectBtn.addEventListener('click', disconnectSync);
+clearLocalDataBtn.addEventListener('click', clearLocalData);
 showCodeBtn.addEventListener('click', showCode);
 syncFromCloudBtn.addEventListener('click', syncFromCloud);
 syncToCloudBtn.addEventListener('click', syncToCloud);
