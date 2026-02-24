@@ -70,10 +70,6 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          install -m 600 /dev/null /tmp/deploy_key
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > /tmp/deploy_key
-          ssh -i /tmp/deploy_key \
-            -o StrictHostKeyChecking=no \
+          ssh -o StrictHostKeyChecking=no \
             fredrik@${{ secrets.DEPLOY_HOST }} \
             'cd /var/www/codex/backend && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d'
-          rm /tmp/deploy_key
