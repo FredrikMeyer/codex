@@ -683,9 +683,9 @@ def test_sync_to_cloud_functionality(page: Page, frontend_url: str, backend_url)
     # Verify data was saved to backend
     from app.storage import load_data
     data = load_data(data_file)
-    logs = data.get("logs", [])
-    # Should have 2 entries synced
-    assert len(logs) >= 2
+    events = data.get("events", [])
+    # Should have 2 events synced
+    assert len(events) >= 2
 
 
 def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backend_url):

@@ -436,8 +436,7 @@ async function syncToCloud() {
     return;
   }
 
-  const dates = [...new Set(entries.map((e) => e.date))];
-  if (dates.length === 0) {
+  if (entries.length === 0) {
     toast('No entries to sync');
     return;
   }
@@ -449,44 +448,33 @@ async function syncToCloud() {
     let successCount = 0;
     let errorCount = 0;
 
-    // Send each day's aggregated counts to the backend
-    for (const date of dates) {
-      const spray = sumForType(entries, date, 'spray');
-      const ventoline = sumForType(entries, date, 'ventoline');
-
+    for (const event of entries) {
       try {
-        const response = await fetch(`${backendUrl}/logs`, {
+        const response = await fetch(`${backendUrl}/events`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({
-            log: {
-              date,
-              spray,
-              ventoline
-            }
-          })
+          body: JSON.stringify({ event })
         });
 
         if (response.ok) {
           successCount++;
         } else {
           errorCount++;
-          console.error(`Failed to sync entry for ${date}:`, await response.text());
+          console.error(`Failed to sync event ${event.id}:`, await response.text());
         }
       } catch (error) {
         errorCount++;
-        console.error(`Network error syncing entry for ${date}:`, error);
+        console.error(`Network error syncing event ${event.id}:`, error);
       }
     }
 
-    // Show result
     if (errorCount === 0) {
-      toast(`✓ Synced ${successCount} ${successCount === 1 ? 'entry' : 'entries'} to cloud`);
+      toast(`✓ Synced ${successCount} ${successCount === 1 ? 'event' : 'events'} to cloud`);
     } else if (successCount > 0) {
-      toast(`⚠ Synced ${successCount} entries, ${errorCount} failed`);
+      toast(`⚠ Synced ${successCount} events, ${errorCount} failed`);
     } else {
       toast('✗ Sync failed. Check your connection.');
     }
@@ -511,7 +499,7 @@ async function syncFromCloud() {
     syncFromCloudBtn.disabled = true;
     syncFromCloudBtn.textContent = 'Syncing...';
 
-    const response = await fetch(`${backendUrl}/logs`, {
+    const response = await fetch(`${backendUrl}/events`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -522,60 +510,29 @@ async function syncFromCloud() {
       if (response.status === 401) {
         throw new Error('Token expired. Please reconnect.');
       }
-      throw new Error('Failed to fetch logs from cloud');
+      throw new Error('Failed to fetch events from cloud');
     }
 
     const data = await response.json();
-    const cloudLogs = data.logs;
+    const cloudEvents = data.events;
 
-    if (cloudLogs.length === 0) {
+    if (cloudEvents.length === 0) {
       toast('No data on cloud yet');
       return;
     }
 
-    // Merge with local entries
-    let newEntries = 0;
-    let updatedEntries = 0;
+    const localIds = new Set(entries.map((e) => e.id));
+    const newEvents = cloudEvents.filter((e) => !localIds.has(e.id));
 
-    for (const cloudLog of cloudLogs) {
-      const { date, spray, ventoline } = cloudLog;
-      const localSpray = sumForType(entries, date, 'spray');
-      const localVentoline = sumForType(entries, date, 'ventoline');
-      const hasLocalEvents = getEventsForDate(entries, date).length > 0;
-
-      if (!hasLocalEvents) {
-        // New entry from cloud — synthesise events
-        if (spray > 0) {
-          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
-        }
-        if (ventoline > 0) {
-          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:01.000Z', type: 'ventoline', count: ventoline, preventive: false });
-        }
-        newEntries++;
-      } else if (localSpray !== spray || localVentoline !== ventoline) {
-        // Cloud differs — replace local events for this date
-        entries = entries.filter((e) => e.date !== date);
-        if (spray > 0) {
-          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
-        }
-        if (ventoline > 0) {
-          entries.push({ id: generateId(), date, timestamp: date + 'T12:00:01.000Z', type: 'ventoline', count: ventoline, preventive: false });
-        }
-        updatedEntries++;
-      }
-    }
-
-    if (newEntries === 0 && updatedEntries === 0) {
+    if (newEvents.length === 0) {
       toast('Already in sync');
-    } else {
-      saveEntries(entries);
-      render(entries);
-
-      const parts = [];
-      if (newEntries > 0) parts.push(`${newEntries} new`);
-      if (updatedEntries > 0) parts.push(`${updatedEntries} updated`);
-      toast(`✓ Synced ${parts.join(', ')} from cloud`);
+      return;
     }
+
+    entries = [...entries, ...newEvents];
+    saveEntries(entries);
+    render(entries);
+    toast(`✓ Synced ${newEvents.length} new ${newEvents.length === 1 ? 'event' : 'events'} from cloud`);
   } catch (error) {
     toast(error.message || 'Sync failed. Check your connection.');
     console.error('Sync from cloud error:', error);
