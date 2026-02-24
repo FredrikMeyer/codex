@@ -43,11 +43,13 @@ const syncToCloudBtn = document.getElementById('sync-to-cloud');
 const entriesEl = document.getElementById('entries');
 const toastEl = document.getElementById('toast');
 const medicineTypeButtons = document.querySelectorAll('.medicine-type');
+const preventiveBtn = document.getElementById('preventive-toggle');
 
 const today = new Date();
 usageDate.valueAsDate = today;
 
 let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
+let preventive = false;
 
 function generateId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -173,6 +175,11 @@ function updateCountForCurrentSelection() {
   updateCount(sumForType(entries, dateKey, selectedMedicineType));
 }
 
+function resetPreventive() {
+  preventive = false;
+  preventiveBtn.classList.remove('active');
+}
+
 let entries = loadEntries();
 entries = migrateToEventLog(entries);
 saveEntries(entries); // Save migrated data
@@ -193,6 +200,7 @@ medicineTypeButtons.forEach((btn) => {
     medicineTypeButtons.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     selectedMedicineType = btn.dataset.type;
+    resetPreventive();
     updateCountForCurrentSelection();
   });
 });
@@ -208,18 +216,24 @@ decBtn.addEventListener('click', () => {
 });
 
 usageDate.addEventListener('change', () => {
+  resetPreventive();
   updateCountForCurrentSelection();
+});
+
+preventiveBtn.addEventListener('click', () => {
+  preventive = !preventive;
+  preventiveBtn.classList.toggle('active', preventive);
 });
 
 saveBtn.addEventListener('click', () => {
   const dateKey = formatDate(usageDate.value);
   const newCount = Number(countEl.textContent) || 0;
-  entries = entries.filter((e) => !(e.date === dateKey && e.type === selectedMedicineType));
   if (newCount > 0) {
-    entries.push({ id: generateId(), date: dateKey, timestamp: createTimestamp(dateKey), type: selectedMedicineType, count: newCount, preventive: false });
+    entries.push({ id: generateId(), date: dateKey, timestamp: createTimestamp(dateKey), type: selectedMedicineType, count: newCount, preventive });
   }
   saveEntries(entries);
   localStorage.setItem(lastTypeKey, selectedMedicineType);
+  updateCount(0);
   render(entries);
   toast('Saved');
 });
@@ -234,14 +248,10 @@ resetBtn.addEventListener('click', () => {
 });
 
 exportBtn.addEventListener('click', () => {
-  const dates = [...new Set(entries.map((e) => e.date))].sort();
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
   const rows = [
-    ['date', 'spray', 'ventoline', 'total'],
-    ...dates.map((d) => {
-      const spray = sumForType(entries, d, 'spray');
-      const ventoline = sumForType(entries, d, 'ventoline');
-      return [d, spray, ventoline, spray + ventoline];
-    })
+    ['date', 'timestamp', 'type', 'count', 'preventive'],
+    ...sorted.map((e) => [e.date, e.timestamp, e.type, e.count, e.preventive])
   ];
   const csv = rows.map((r) => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });

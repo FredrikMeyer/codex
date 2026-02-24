@@ -109,6 +109,23 @@ input[type="date"] {
   background: rgba(37,99,235,0.3);
 }
 
+.preventive-toggle {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.preventive-toggle.active {
+  background: rgba(37,99,235,0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .counter {
   display: grid;
   grid-template-columns: 60px 1fr 60px;
