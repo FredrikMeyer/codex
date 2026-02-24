@@ -5,6 +5,7 @@ Provides framework-independent data access, hiding storage implementation detail
 """
 
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -134,6 +135,64 @@ class LogRepository:
                 for entry in data.get("events", [])
                 if entry.get("code") == code
             ]
+
+    # Stable namespace for deterministic migration event IDs.
+    _MIGRATION_NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+
+    def migrate_logs_to_events(self) -> None:
+        """
+        One-time migration: convert old log entries in data["logs"] to events in data["events"].
+
+        Each log entry with spray > 0 or ventoline > 0 becomes a separate event.
+        Event IDs are derived deterministically from (code, date, type) so the
+        migration is safe to run multiple times without creating duplicates.
+        Timestamps default to midnight UTC for the event date.
+        """
+        if not self.data_file.exists():
+            return
+
+        with self._lock:
+            data = load_data(self.data_file)
+            logs = data.get("logs", [])
+            if not logs:
+                return
+
+            existing_event_ids = {
+                entry["event"].get("id")
+                for entry in data.get("events", [])
+            }
+
+            new_entries: List[Dict[str, Any]] = []
+            for log_entry in logs:
+                code = log_entry.get("code", "")
+                log = log_entry.get("log", {})
+                date = log.get("date", "")
+                received_at = log_entry.get("received_at", datetime.now(timezone.utc).isoformat())
+
+                for medicine_type in ("spray", "ventoline"):
+                    count = log.get(medicine_type) or 0
+                    if count <= 0:
+                        continue
+                    event_id = str(uuid.uuid5(self._MIGRATION_NS, f"{code}:{date}:{medicine_type}"))
+                    if event_id in existing_event_ids:
+                        continue
+                    new_entries.append({
+                        "code": code,
+                        "event": {
+                            "id": event_id,
+                            "date": date,
+                            "timestamp": f"{date}T12:00:00.000Z",
+                            "type": medicine_type,
+                            "count": count,
+                            "preventive": False,
+                        },
+                        "received_at": received_at,
+                    })
+                    existing_event_ids.add(event_id)
+
+            if new_entries:
+                data.setdefault("events", []).extend(new_entries)
+                save_data(self.data_file, data)
 
     def code_exists(self, code: str) -> bool:
         """

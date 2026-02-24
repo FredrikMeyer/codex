@@ -175,6 +175,9 @@ def create_app(data_file: str | Path | None = None) -> Flask:
     # Create repository for data access
     log_repository = LogRepository(app.config["DATA_FILE"])
 
+    # Migrate old log entries to the event format on startup (idempotent)
+    log_repository.migrate_logs_to_events()
+
     data_lock = threading.Lock()
 
     def read_data() -> Dict[str, Any]:
