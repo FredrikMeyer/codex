@@ -761,22 +761,23 @@ def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backen
 
 def test_clear_local_data_removes_entries(page: Page, frontend_url: str, backend_url):
     """Clear local data button wipes entries but keeps sync token."""
-    backend_base_url, _ = backend_url
+    import secrets
+    from app.storage import load_data, save_data
+
+    backend_base_url, data_file = backend_url
     page.add_init_script(f"window.backendUrl = '{backend_base_url}';")
     page.goto(frontend_url)
 
     page.evaluate("localStorage.clear()")
+
+    # Inject a code+token directly into the data file to avoid the rate-limited endpoint
+    token = secrets.token_hex(32)
+    data = load_data(data_file)
+    data.setdefault("codes", []).append({"code": "CLRTEST", "token": token})
+    save_data(data_file, data)
+
+    page.evaluate(f"localStorage.setItem('asthma-auth-token', '{token}')")
     page.reload()
-
-    # Set up sync so the clear button is visible
-    generate_btn = page.locator("#generate-code")
-    generate_btn.click()
-    page.wait_for_timeout(2000)
-
-    code = page.locator("#generated-code").text_content()
-    page.locator("#code-input").fill(code)
-    page.locator("#complete-setup").click()
-    page.wait_for_timeout(2000)
 
     # Save a couple of entries
     increment_btn = page.locator("#increment")
