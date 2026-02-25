@@ -14,7 +14,32 @@ env:
   IMAGE_NAME: ${{ github.repository }}/backend
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -e .
+
+      - name: Install Playwright browsers
+        working-directory: backend
+        run: playwright install chromium --with-deps
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest --ignore=tests/test_playwright_example.py
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
