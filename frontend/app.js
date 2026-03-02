@@ -73,6 +73,22 @@ function sumForType(events, date, type) {
     .reduce((sum, e) => sum + e.count, 0);
 }
 
+function aggregateByDate(events, days = 30) {
+  const now = new Date();
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    const spray = sumForType(events, date, 'spray');
+    const ventoline = sumForType(events, date, 'ventoline');
+    if (spray > 0 || ventoline > 0) {
+      result.push({ date, spray, ventoline });
+    }
+  }
+  return result;
+}
+
 function loadEntries() {
   const raw = localStorage.getItem(storageKey);
   try {
@@ -148,12 +164,66 @@ function render(events) {
     del.addEventListener('click', () => {
       entries = entries.filter((e) => e.date !== date);
       saveEntries(entries);
-      render(entries);
+      renderAll(entries);
       toast('Entry removed');
     });
     item.appendChild(del);
     entriesEl.appendChild(item);
   }
+}
+
+function renderChart(events) {
+  const chartEl = document.getElementById('chart');
+  const data = aggregateByDate(events);
+
+  if (data.length === 0) {
+    chartEl.innerHTML = '<div class="hint">No data yet.</div>';
+    return;
+  }
+
+  const WIDTH = 600;
+  const HEIGHT = 180;
+  const PAD_LEFT = 20;
+  const PAD_RIGHT = 10;
+  const PAD_TOP = 10;
+  const PAD_BOTTOM = 30;
+  const chartWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
+  const chartHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
+
+  const maxDoses = Math.max(...data.map((d) => d.spray + d.ventoline));
+  const barGroupWidth = chartWidth / data.length;
+  const barWidth = Math.min(barGroupWidth * 0.35, 18);
+  const gap = barWidth * 0.3;
+  const barH = (value) => (value / maxDoses) * chartHeight;
+  const barY = (value) => PAD_TOP + chartHeight - barH(value);
+  const labelStep = Math.max(1, Math.ceil(data.length / 8));
+
+  const elements = data.flatMap((d, i) => {
+    const cx = PAD_LEFT + i * barGroupWidth + barGroupWidth / 2;
+    const sprayX = cx - barWidth - gap / 2;
+    const ventX = cx + gap / 2;
+    const parts = [];
+    if (d.spray > 0) {
+      parts.push(`<rect class="bar-spray" x="${sprayX.toFixed(1)}" y="${barY(d.spray).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.spray).toFixed(1)}"><title>Spray: ${d.spray}</title></rect>`);
+    }
+    if (d.ventoline > 0) {
+      parts.push(`<rect class="bar-ventoline" x="${ventX.toFixed(1)}" y="${barY(d.ventoline).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.ventoline).toFixed(1)}"><title>Ventoline: ${d.ventoline}</title></rect>`);
+    }
+    if (i % labelStep === 0) {
+      const date = new Date(d.date + 'T12:00:00Z');
+      const label = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+      parts.push(`<text class="axis-label" x="${cx.toFixed(1)}" y="${(HEIGHT - 8).toFixed(1)}" text-anchor="middle">${label}</text>`);
+    }
+    return parts;
+  });
+
+  const gridLine = `<line class="grid-line" x1="${PAD_LEFT}" y1="${PAD_TOP}" x2="${WIDTH - PAD_RIGHT}" y2="${PAD_TOP}"/>`;
+  chartEl.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">${gridLine}${elements.join('')}</svg>`;
+}
+
+function renderAll(events) {
+  render(events);
+  renderChart(events);
 }
 
 function toast(message) {
@@ -234,7 +304,7 @@ saveBtn.addEventListener('click', () => {
   saveEntries(entries);
   localStorage.setItem(lastTypeKey, selectedMedicineType);
   updateCount(0);
-  render(entries);
+  renderAll(entries);
   toast('Saved');
 });
 
@@ -243,7 +313,7 @@ resetBtn.addEventListener('click', () => {
   entries = entries.filter((e) => e.date !== dateKey);
   updateCount(0);
   saveEntries(entries);
-  render(entries);
+  renderAll(entries);
   toast('Reset for day');
 });
 
@@ -377,7 +447,7 @@ function clearLocalData() {
   if (confirm('Clear all local data on this device? Your cloud data is unaffected. You can sync it back afterwards.')) {
     entries = [];
     saveEntries(entries);
-    render(entries);
+    renderAll(entries);
     updateCount(0);
     toast('Local data cleared');
   }
@@ -566,7 +636,7 @@ async function syncFromCloud() {
 
     entries = [...entries, ...trulyNew];
     saveEntries(entries);
-    render(entries);
+    renderAll(entries);
 
     if (trulyNew.length > 0) {
       toast(`✓ Synced ${trulyNew.length} new ${trulyNew.length === 1 ? 'event' : 'events'} from cloud`);
@@ -610,4 +680,4 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-render(entries);
+renderAll(entries);

@@ -332,6 +332,12 @@ button.ghost.danger {
   border: 1px solid rgba(16,185,129,0.2);
 }
 
+#chart svg { width: 100%; display: block; }
+#chart .axis-label { fill: var(--muted); font-size: 10px; }
+#chart .bar-spray { fill: var(--accent); }
+#chart .bar-ventoline { fill: #f59e0b; }
+#chart .grid-line { stroke: var(--border); }
+
 @media (max-width: 600px) {
   body { padding: 16px; }
   .actions { flex-direction: column; }
