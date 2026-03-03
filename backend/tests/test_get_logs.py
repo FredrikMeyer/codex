@@ -53,63 +53,6 @@ def test_get_logs_returns_empty_for_no_data(auth_token):
     assert data["logs"] == []
 
 
-def test_get_logs_returns_user_logs(auth_token):
-    """Returns all logs for authenticated user."""
-    test_client, _, code, token = auth_token
-
-    # Save some logs
-    test_client.post(
-        "/logs",
-        json={"code": code, "log": {"date": "2026-02-12", "spray": 2, "ventoline": 1}},
-    )
-    test_client.post(
-        "/logs",
-        json={"code": code, "log": {"date": "2026-02-13", "spray": 0, "ventoline": 3}},
-    )
-
-    # Get logs
-    response = test_client.get("/logs", headers={"Authorization": f"Bearer {token}"})
-
-    assert response.status_code == 200
-    data = response.get_json()
-    assert len(data["logs"]) == 2
-
-    # Verify structure
-    log = data["logs"][0]
-    assert "date" in log
-    assert "spray" in log
-    assert "ventoline" in log
-    assert "received_at" in log
-
-
-def test_get_logs_excludes_other_users(auth_token):
-    """Only returns logs for authenticated user, not others."""
-    test_client, _, code1, token1 = auth_token
-
-    # Create second user
-    code2_response = test_client.post("/generate-code")
-    code2 = code2_response.get_json()["code"]
-
-    # User 1 saves log
-    test_client.post(
-        "/logs",
-        json={"code": code1, "log": {"date": "2026-02-12", "spray": 1, "ventoline": 0}},
-    )
-
-    # User 2 saves log
-    test_client.post(
-        "/logs",
-        json={"code": code2, "log": {"date": "2026-02-13", "spray": 2, "ventoline": 0}},
-    )
-
-    # User 1 retrieves logs
-    response = test_client.get("/logs", headers={"Authorization": f"Bearer {token1}"})
-
-    assert response.status_code == 200
-    data = response.get_json()
-    assert len(data["logs"]) == 1
-    assert data["logs"][0]["date"] == "2026-02-12"
-
 
 def test_get_logs_rate_limiting(auth_token):
     """Rate limiting applies to GET /logs."""

@@ -51,8 +51,20 @@ def server_url(tmp_path_factory):
     server_thread.shutdown()
 
 
+def _make_event(date, medicine_type, count=1):
+    import uuid
+    return {
+        "id": str(uuid.uuid4()),
+        "date": date,
+        "timestamp": f"{date}T12:00:00.000Z",
+        "type": medicine_type,
+        "count": count,
+        "preventive": False,
+    }
+
+
 def test_e2e_generate_code_and_login_flow(server_url):
-    """Test the complete flow: generate code, login, and save logs."""
+    """Test the complete flow: generate code, get token, and save event."""
 
     # Step 1: Generate a code
     response = requests.post(f"{server_url}/generate-code")
@@ -62,35 +74,23 @@ def test_e2e_generate_code_and_login_flow(server_url):
     code = data["code"]
     assert len(code) == 6
 
-    # Step 2: Login with the code
-    login_response = requests.post(
-        f"{server_url}/login",
-        json={"code": code}
-    )
-    assert login_response.status_code == 200
-    login_data = login_response.json()
-    assert login_data["status"] == "ok"
+    # Step 2: Exchange code for token
+    token_response = requests.post(f"{server_url}/generate-token", json={"code": code})
+    assert token_response.status_code == 200
+    token = token_response.json()["token"]
 
-    # Step 3: Save a log entry
-    log_payload = {
-        "code": code,
-        "log": {
-            "date": "2026-02-09",
-            "spray": 2,
-            "ventoline": 1
-        }
-    }
-    log_response = requests.post(
-        f"{server_url}/logs",
-        json=log_payload
+    # Step 3: Save an event using token
+    event_response = requests.post(
+        f"{server_url}/events",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"event": _make_event("2026-02-09", "spray", 2)},
     )
-    assert log_response.status_code == 200
-    log_data = log_response.json()
-    assert log_data["status"] == "saved"
+    assert event_response.status_code == 200
+    assert event_response.json()["status"] == "saved"
 
 
 def test_e2e_invalid_code_rejection(server_url):
-    """Test that invalid codes are rejected."""
+    """Test that invalid codes and tokens are rejected."""
 
     # Try to login with invalid code
     response = requests.post(
@@ -101,51 +101,45 @@ def test_e2e_invalid_code_rejection(server_url):
     data = response.json()
     assert "error" in data
 
-    # Try to save log with invalid code
+    # Try to save event with invalid token
     response = requests.post(
-        f"{server_url}/logs",
-        json={
-            "code": "INVALID",
-            "log": {"date": "2026-02-09", "spray": 1}
-        }
+        f"{server_url}/events",
+        headers={"Authorization": "Bearer invalid-token"},
+        json={"event": _make_event("2026-02-09", "spray", 1)},
     )
-    assert response.status_code == 400
-    data = response.json()
-    assert "error" in data
+    assert response.status_code == 401
+    assert "error" in response.json()
 
 
 def test_e2e_multiple_codes_are_independent(server_url):
     """Test that multiple codes can coexist."""
 
-    # Generate first code
+    # Generate first code and token
     response1 = requests.post(f"{server_url}/generate-code")
     code1 = response1.json()["code"]
+    token1 = requests.post(f"{server_url}/generate-token", json={"code": code1}).json()["token"]
 
-    # Generate second code
+    # Generate second code and token
     response2 = requests.post(f"{server_url}/generate-code")
     code2 = response2.json()["code"]
+    token2 = requests.post(f"{server_url}/generate-token", json={"code": code2}).json()["token"]
 
     assert code1 != code2
 
-    # Both codes should work for login
-    login1 = requests.post(f"{server_url}/login", json={"code": code1})
-    assert login1.status_code == 200
-
-    login2 = requests.post(f"{server_url}/login", json={"code": code2})
-    assert login2.status_code == 200
-
-    # Both codes should work for saving logs
-    log1 = requests.post(
-        f"{server_url}/logs",
-        json={"code": code1, "log": {"date": "2026-02-09", "spray": 1}}
+    # Both tokens should work for saving events
+    event1 = requests.post(
+        f"{server_url}/events",
+        headers={"Authorization": f"Bearer {token1}"},
+        json={"event": _make_event("2026-02-09", "spray", 1)},
     )
-    assert log1.status_code == 200
+    assert event1.status_code == 200
 
-    log2 = requests.post(
-        f"{server_url}/logs",
-        json={"code": code2, "log": {"date": "2026-02-10", "spray": 2}}
+    event2 = requests.post(
+        f"{server_url}/events",
+        headers={"Authorization": f"Bearer {token2}"},
+        json={"event": _make_event("2026-02-10", "spray", 2)},
     )
-    assert log2.status_code == 200
+    assert event2.status_code == 200
 
 
 def test_e2e_token_generation_flow(server_url):
@@ -180,7 +174,7 @@ def test_e2e_token_generation_flow(server_url):
 
 
 def test_e2e_complete_token_auth_workflow(server_url):
-    """Test the complete workflow: code → token → save log with token."""
+    """Test the complete workflow: code → token → save event with token."""
 
     # Step 1: Generate a code
     code_response = requests.post(f"{server_url}/generate-code")
@@ -193,11 +187,11 @@ def test_e2e_complete_token_auth_workflow(server_url):
     )
     token = token_response.json()["token"]
 
-    # Step 3: Save log using token (no code needed)
-    log_response = requests.post(
-        f"{server_url}/logs",
+    # Step 3: Save event using token
+    event_response = requests.post(
+        f"{server_url}/events",
         headers={"Authorization": f"Bearer {token}"},
-        json={"log": {"date": "2026-02-09", "spray": 2, "ventoline": 1}}
+        json={"event": _make_event("2026-02-09", "spray", 2)},
     )
-    assert log_response.status_code == 200
-    assert log_response.json()["status"] == "saved"
+    assert event_response.status_code == 200
+    assert event_response.json()["status"] == "saved"

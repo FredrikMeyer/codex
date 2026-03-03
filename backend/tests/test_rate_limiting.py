@@ -5,10 +5,8 @@ Rate limits prevent abuse and ensure fair usage:
 - /generate-code: 5 per hour (prevents code generation spam)
 - /login: 10 per minute (prevents brute force)
 - /generate-token: 10 per minute (prevents token generation spam)
-- /logs: 100 per minute (generous for normal usage)
 """
 
-import time
 from pathlib import Path
 
 import pytest
@@ -63,17 +61,6 @@ def test_generate_token_rate_limit(client):
     response = client.post("/generate-token", json={"code": "TEST"})
     assert response.status_code == 429
 
-
-def test_logs_rate_limit(client):
-    """POST /logs is rate limited to 100 per minute."""
-    # First 100 requests should succeed (or fail with 400/401 for auth)
-    for i in range(100):
-        response = client.post("/logs", json={"log": {"date": "2026-02-09", "spray": 1}})
-        assert response.status_code in [200, 400, 401], f"Request {i+1} should not be rate limited"
-
-    # 101st request should be rate limited
-    response = client.post("/logs", json={"log": {"date": "2026-02-09", "spray": 1}})
-    assert response.status_code == 429
 
 
 def test_rate_limit_includes_retry_after_header(client):

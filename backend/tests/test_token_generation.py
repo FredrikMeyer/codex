@@ -146,10 +146,3 @@ def test_existing_endpoints_still_work(client):
     # Login with code (existing endpoint)
     login_response = test_client.post("/login", json={"code": code})
     assert login_response.status_code == 200
-
-    # Save log with code (existing endpoint)
-    log_response = test_client.post(
-        "/logs",
-        json={"code": code, "log": {"date": "2026-02-09", "spray": 1}}
-    )
-    assert log_response.status_code == 200

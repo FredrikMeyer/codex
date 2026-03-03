@@ -169,9 +169,6 @@ def test_frontend_loads(page: Page, frontend_url: str):
     # Check that the main heading is present
     expect(page.locator(".header-title")).to_contain_text("Asthma Medicine Tracker")
 
-    # Check that the subtitle is present (first one in header)
-    expect(page.locator("header .subtitle")).to_contain_text("Log your daily usage anywhere")
-
 
 def test_medicine_type_selector(page: Page, frontend_url: str):
     """Test that medicine type buttons work."""

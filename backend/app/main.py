@@ -1,14 +1,13 @@
 
-import json
 import os
 import random
 import secrets
 import string
 import threading
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -21,39 +20,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .repository import LogRepository
 from .storage import load_data, save_data
 
-
-class LogEntry(BaseModel):
-    """Validated log entry for asthma medicine usage."""
-
-    date: str = Field(..., description="Date in YYYY-MM-DD format")
-    spray: Optional[int] = Field(None, ge=0, description="Spray doses (non-negative)")
-    ventoline: Optional[int] = Field(None, ge=0, description="Ventoline doses (non-negative)")
-
-    @field_validator("date")
-    @classmethod
-    def validate_date_format(cls, v: str) -> str:
-        """Validate date is in YYYY-MM-DD format and is a valid date."""
-        try:
-            datetime.strptime(v, "%Y-%m-%d")
-        except ValueError as e:
-            raise ValueError(f"Date must be in YYYY-MM-DD format and be a valid date: {e}")
-        return v
-
-    @field_validator("spray", "ventoline")
-    @classmethod
-    def validate_non_negative(cls, v: Optional[int]) -> Optional[int]:
-        """Validate counts are non-negative."""
-        if v is not None and v < 0:
-            raise ValueError("Medicine count must be non-negative")
-        return v
-
-    def model_post_init(self, __context: Any) -> None:
-        """Validate that at least one medicine type is provided with non-zero count."""
-        spray_count = self.spray or 0
-        ventoline_count = self.ventoline or 0
-
-        if spray_count == 0 and ventoline_count == 0:
-            raise ValueError("At least one medicine type must have a non-zero count")
 
 
 class UsageEvent(BaseModel):
@@ -289,72 +255,6 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         write_data(data)
 
         return jsonify({"token": token})
-
-    @app.post("/logs")
-    @limiter.limit("100 per minute")
-    def save_log() -> Any:
-        payload = request.get_json(silent=True) or {}
-        log = payload.get("log")
-
-        if not isinstance(log, dict):
-            return jsonify({"error": "'log' (object) is required"}), 400
-
-        # Validate log entry structure
-        try:
-            validated_log = LogEntry(**log)
-        except ValidationError as e:
-            # Extract first error message for simplicity
-            first_error = e.errors()[0]
-            field = first_error["loc"][0] if first_error["loc"] else "log"
-            message = first_error["msg"]
-            return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 400
-
-        # Try token authentication first (preferred)
-        auth_header = request.headers.get("Authorization", "")
-        token_valid = False
-        code_from_token = None
-
-        if auth_header.strip():
-            parts = auth_header.strip().split()
-            if len(parts) == 2 and parts[0] == "Bearer":
-                token = parts[1]
-                if token:
-                    # Validate token
-                    data = read_data()
-                    for entry in data.get("codes", []):
-                        if entry.get("token") == token:
-                            token_valid = True
-                            code_from_token = entry["code"]
-                            break
-
-                    if not token_valid:
-                        return jsonify({"error": "Invalid token"}), 401
-
-        # Fall back to code authentication if no valid token
-        if not token_valid:
-            code = payload.get("code")
-
-            if not code:
-                return (
-                    jsonify({"error": "Either 'code' in body or 'Authorization' header is required"}),
-                    400,
-                )
-
-            data = read_data()
-            matching_codes = {entry["code"] for entry in data.get("codes", [])}
-            if code not in matching_codes:
-                return jsonify({"error": "Unknown code"}), 400
-        else:
-            # Token auth succeeded, load data
-            code = code_from_token
-            assert code is not None, "code_from_token must be set when token_valid is True"
-            data = read_data()
-
-        # Save the log using repository
-        log_repository.save_log(code, log)
-        return jsonify({"status": "saved"})
 
     @app.get("/logs")
     @require_auth()
