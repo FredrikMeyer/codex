@@ -22,17 +22,14 @@ from .storage import load_data, save_data
 
 
 
-class UsageEvent(BaseModel):
-    """A single medicine usage event with timestamp and attributes."""
+class BaseEvent(BaseModel):
+    """Common fields for all tracking events."""
 
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Client-generated UUID for deduplication")
     date: str = Field(..., description="Date in YYYY-MM-DD format")
     timestamp: str = Field(..., description="ISO 8601 datetime of the usage")
-    type: str = Field(..., description="Medicine type: 'spray' or 'ventoline'")
-    count: int = Field(..., ge=1, description="Number of doses (at least 1)")
-    preventive: bool = Field(False, description="Whether this usage was preventive")
 
     @field_validator("date")
     @classmethod
@@ -54,6 +51,14 @@ class UsageEvent(BaseModel):
             raise ValueError(f"Timestamp must be a valid ISO 8601 datetime: {e}")
         return v
 
+
+class AsthmaMedicineEvent(BaseEvent):
+    """An asthma medicine usage event (spray or ventoline)."""
+
+    type: str = Field(..., description="Medicine type: 'spray' or 'ventoline'")
+    count: int = Field(..., ge=1, description="Number of doses (at least 1)")
+    preventive: bool = Field(False, description="Whether this usage was preventive")
+
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
@@ -61,6 +66,12 @@ class UsageEvent(BaseModel):
         if v not in ("spray", "ventoline"):
             raise ValueError("Type must be 'spray' or 'ventoline'")
         return v
+
+
+class RitalinEvent(BaseEvent):
+    """A Ritalin dose event."""
+
+    count: int = Field(..., ge=1, description="Number of doses (at least 1)")
 
 
 # Storage functions moved to storage.py module
@@ -345,7 +356,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
             return jsonify({"error": "'event' (object) is required"}), 400
 
         try:
-            UsageEvent(**event)
+            AsthmaMedicineEvent(**event)
         except ValidationError as e:
             first_error = e.errors()[0]
             field = first_error["loc"][0] if first_error["loc"] else "event"
@@ -389,6 +400,74 @@ def create_app(data_file: str | Path | None = None) -> Flask:
             return jsonify({"error": "Invalid token"}), 401
 
         return jsonify({"events": log_repository.get_events(code)})
+
+    @app.post("/ritalin-events")
+    @require_auth()
+    @limiter.limit("100 per minute")
+    def save_ritalin_event() -> Any:
+        """
+        Save a single Ritalin dose event for the authenticated user.
+
+        Requires:
+            Authorization: Bearer <token> header
+
+        Body:
+            JSON: {"event": {"id", "date", "timestamp", "count"}}
+
+        Returns:
+            JSON: {"status": "saved"} or {"status": "duplicate"} if id already exists
+        """
+        payload = request.get_json(silent=True) or {}
+        event = payload.get("event")
+
+        if not isinstance(event, dict):
+            return jsonify({"error": "'event' (object) is required"}), 400
+
+        try:
+            RitalinEvent(**event)
+        except ValidationError as e:
+            first_error = e.errors()[0]
+            field = first_error["loc"][0] if first_error["loc"] else "event"
+            message = first_error["msg"]
+            return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
+
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]
+        data = read_data()
+        code = next(
+            (entry["code"] for entry in data.get("codes", []) if entry.get("token") == token),
+            None,
+        )
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        log_repository.save_ritalin_event(code, event)
+        return jsonify({"status": "saved"})
+
+    @app.get("/ritalin-events")
+    @require_auth()
+    @limiter.limit("100 per minute")
+    def get_ritalin_events() -> Any:
+        """
+        Retrieve all Ritalin dose events for the authenticated user.
+
+        Requires:
+            Authorization: Bearer <token> header
+
+        Returns:
+            JSON: {"events": [{"id", "date", "timestamp", "count", "received_at"}]}
+        """
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]
+        data = read_data()
+        code = next(
+            (entry["code"] for entry in data.get("codes", []) if entry.get("token") == token),
+            None,
+        )
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        return jsonify({"events": log_repository.get_ritalin_events(code)})
 
     @app.get("/health")
     def health() -> Any:

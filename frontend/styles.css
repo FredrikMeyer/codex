@@ -6,6 +6,7 @@
   --muted: #94a3b8;
   --accent: #2563eb;
   --accent-strong: #1d4ed8;
+  --accent-ritalin: #a855f7;
   --surface: #111827;
   --border: rgba(255,255,255,0.08);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -337,6 +338,46 @@ button.ghost.danger {
 #chart .bar-spray { fill: var(--accent); }
 #chart .bar-ventoline { fill: #f59e0b; }
 #chart .grid-line { stroke: var(--border); }
+
+#ritalin-chart svg { width: 100%; display: block; }
+#ritalin-chart .axis-label { fill: var(--muted); font-size: 10px; }
+#ritalin-chart .bar-ritalin { fill: var(--accent-ritalin); }
+#ritalin-chart .grid-line { stroke: var(--border); }
+
+.tab-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px;
+}
+.tab {
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.tab.active {
+  background: rgba(255,255,255,0.1);
+  color: var(--text);
+}
+.tab:not(.active):hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+.tab-panel[hidden] { display: none; }
+
+button.ritalin-primary {
+  background: linear-gradient(135deg, var(--accent-ritalin), #9333ea);
+  box-shadow: 0 12px 30px rgba(168,85,247,0.35);
+}
 
 @media (max-width: 600px) {
   body { padding: 16px; }

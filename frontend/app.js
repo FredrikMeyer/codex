@@ -8,6 +8,7 @@ const backendUrl = window.backendUrl || (window.location.hostname === 'localhost
 const storageKey = 'asthma-usage-entries';
 const lastTypeKey = 'asthma-last-medicine-type';
 const tokenKey = 'asthma-auth-token';
+const RITALIN_KEY = 'ritalin-usage-entries';
 
 // Token management functions
 function getToken() {
@@ -357,6 +358,8 @@ function updateSyncStatus() {
     syncConfiguredSection.style.display = 'block';
     syncFromCloudBtn.style.display = 'block';
     syncToCloudBtn.style.display = 'block';
+    ritalinSyncFromCloudBtn.style.display = 'block';
+    ritalinSyncToCloudBtn.style.display = 'block';
   } else {
     syncStatusText.textContent = 'Not configured';
     syncStatusDot.classList.remove('connected');
@@ -364,6 +367,8 @@ function updateSyncStatus() {
     syncConfiguredSection.style.display = 'none';
     syncFromCloudBtn.style.display = 'none';
     syncToCloudBtn.style.display = 'none';
+    ritalinSyncFromCloudBtn.style.display = 'none';
+    ritalinSyncToCloudBtn.style.display = 'none';
   }
 }
 
@@ -668,8 +673,288 @@ codeInput.addEventListener('keypress', (e) => {
   }
 });
 
+// Ritalin sync buttons — declared here so updateSyncStatus() can reference them
+const ritalinSyncFromCloudBtn = document.getElementById('ritalin-sync-from-cloud');
+const ritalinSyncToCloudBtn = document.getElementById('ritalin-sync-to-cloud');
+
 // Initialize sync status on page load
 updateSyncStatus();
+
+// --- Tab navigation ---
+const tabButtons = document.querySelectorAll('.tab');
+const tabPanels = document.querySelectorAll('.tab-panel');
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    tabButtons.forEach((b) => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    tabPanels.forEach((p) => p.setAttribute('hidden', ''));
+
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    const panel = document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`);
+    if (panel) panel.removeAttribute('hidden');
+  });
+});
+
+// --- Ritalin storage ---
+function loadRitalinEntries() {
+  const raw = localStorage.getItem(RITALIN_KEY);
+  try {
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveRitalinEntries(entries) {
+  localStorage.setItem(RITALIN_KEY, JSON.stringify(entries));
+}
+
+// --- Ritalin aggregation ---
+function aggregateRitalinByDate(events, days = 30) {
+  const now = new Date();
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    const count = events
+      .filter((e) => e.date === date)
+      .reduce((sum, e) => sum + e.count, 0);
+    if (count > 0) result.push({ date, count });
+  }
+  return result;
+}
+
+// --- Ritalin chart ---
+function renderRitalinChart(events) {
+  const chartEl = document.getElementById('ritalin-chart');
+  const data = aggregateRitalinByDate(events);
+
+  if (data.length === 0) {
+    chartEl.innerHTML = '<div class="hint">No data yet.</div>';
+    return;
+  }
+
+  const WIDTH = 600;
+  const HEIGHT = 180;
+  const PAD_LEFT = 20;
+  const PAD_RIGHT = 10;
+  const PAD_TOP = 10;
+  const PAD_BOTTOM = 30;
+  const chartWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
+  const chartHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
+
+  const maxDoses = Math.max(...data.map((d) => d.count));
+  const barGroupWidth = chartWidth / data.length;
+  const barWidth = Math.min(barGroupWidth * 0.6, 24);
+  const barH = (value) => (value / maxDoses) * chartHeight;
+  const barY = (value) => PAD_TOP + chartHeight - barH(value);
+  const labelStep = Math.max(1, Math.ceil(data.length / 8));
+
+  const elements = data.flatMap((d, i) => {
+    const cx = PAD_LEFT + i * barGroupWidth + barGroupWidth / 2;
+    const parts = [];
+    parts.push(`<rect class="bar-ritalin" x="${(cx - barWidth / 2).toFixed(1)}" y="${barY(d.count).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.count).toFixed(1)}"><title>Doses: ${d.count}</title></rect>`);
+    if (i % labelStep === 0) {
+      const date = new Date(d.date + 'T12:00:00Z');
+      const label = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+      parts.push(`<text class="axis-label" x="${cx.toFixed(1)}" y="${(HEIGHT - 8).toFixed(1)}" text-anchor="middle">${label}</text>`);
+    }
+    return parts;
+  });
+
+  const gridLine = `<line class="grid-line" x1="${PAD_LEFT}" y1="${PAD_TOP}" x2="${WIDTH - PAD_RIGHT}" y2="${PAD_TOP}"/>`;
+  chartEl.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">${gridLine}${elements.join('')}</svg>`;
+}
+
+// --- Ritalin history ---
+function renderRitalinEntries(events) {
+  const entriesEl = document.getElementById('ritalin-entries');
+  entriesEl.innerHTML = '';
+  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => new Date(b) - new Date(a));
+  if (!dates.length) {
+    entriesEl.innerHTML = '<div class="hint">No history yet. Log your first dose.</div>';
+    return;
+  }
+  for (const date of dates) {
+    const total = events.filter((e) => e.date === date).reduce((sum, e) => sum + e.count, 0);
+    const item = document.createElement('div');
+    item.className = 'entry';
+    item.innerHTML = `<div><div class="date">${date}</div><div class="count">${total} ${total === 1 ? 'dose' : 'doses'}</div></div>`;
+    const del = document.createElement('button');
+    del.textContent = 'Delete';
+    del.className = 'ghost';
+    del.addEventListener('click', () => {
+      ritalinEntries = ritalinEntries.filter((e) => e.date !== date);
+      saveRitalinEntries(ritalinEntries);
+      renderRitalinAll(ritalinEntries);
+      toast('Entry removed');
+    });
+    item.appendChild(del);
+    entriesEl.appendChild(item);
+  }
+}
+
+function renderRitalinAll(events) {
+  renderRitalinEntries(events);
+  renderRitalinChart(events);
+}
+
+// --- Ritalin DOM elements ---
+const ritalinDateEl = document.getElementById('ritalin-date');
+const ritalinCountEl = document.getElementById('ritalin-count');
+const ritalinIncBtn = document.getElementById('ritalin-increment');
+const ritalinDecBtn = document.getElementById('ritalin-decrement');
+const ritalinSaveBtn = document.getElementById('ritalin-save');
+const ritalinResetBtn = document.getElementById('ritalin-reset-day');
+const ritalinExportBtn = document.getElementById('ritalin-export');
+
+ritalinDateEl.valueAsDate = new Date();
+
+let ritalinEntries = loadRitalinEntries();
+
+function updateRitalinCountForDate() {
+  const date = formatDate(ritalinDateEl.value);
+  const total = ritalinEntries
+    .filter((e) => e.date === date)
+    .reduce((sum, e) => sum + e.count, 0);
+  ritalinCountEl.textContent = total;
+}
+
+ritalinDateEl.addEventListener('change', updateRitalinCountForDate);
+
+ritalinIncBtn.addEventListener('click', () => {
+  ritalinCountEl.textContent = (Number(ritalinCountEl.textContent) || 0) + 1;
+});
+
+ritalinDecBtn.addEventListener('click', () => {
+  ritalinCountEl.textContent = Math.max(0, (Number(ritalinCountEl.textContent) || 0) - 1);
+});
+
+ritalinSaveBtn.addEventListener('click', () => {
+  const dateKey = formatDate(ritalinDateEl.value);
+  const newCount = Number(ritalinCountEl.textContent) || 0;
+  if (newCount > 0) {
+    ritalinEntries.push({ id: generateId(), date: dateKey, timestamp: createTimestamp(dateKey), count: newCount });
+  }
+  saveRitalinEntries(ritalinEntries);
+  ritalinCountEl.textContent = 0;
+  renderRitalinAll(ritalinEntries);
+  toast('Saved');
+});
+
+ritalinResetBtn.addEventListener('click', () => {
+  const dateKey = formatDate(ritalinDateEl.value);
+  ritalinEntries = ritalinEntries.filter((e) => e.date !== dateKey);
+  ritalinCountEl.textContent = 0;
+  saveRitalinEntries(ritalinEntries);
+  renderRitalinAll(ritalinEntries);
+  toast('Reset for day');
+});
+
+ritalinExportBtn.addEventListener('click', () => {
+  const sorted = [...ritalinEntries].sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
+  const rows = [
+    ['date', 'timestamp', 'count'],
+    ...sorted.map((e) => [e.date, e.timestamp, e.count])
+  ];
+  const csv = rows.map((r) => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ritalin-usage.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exported');
+});
+
+// --- Ritalin cloud sync ---
+async function syncRitalinToCloud() {
+  const token = getToken();
+  if (!token) { toast('Please set up cloud sync first'); return; }
+  if (ritalinEntries.length === 0) { toast('No entries to sync'); return; }
+
+  try {
+    ritalinSyncToCloudBtn.disabled = true;
+    ritalinSyncToCloudBtn.textContent = 'Syncing...';
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const event of ritalinEntries) {
+      try {
+        const response = await fetch(`${backendUrl}/ritalin-events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ event })
+        });
+        if (response.ok) { successCount++; } else { errorCount++; }
+      } catch (_) { errorCount++; }
+    }
+
+    if (errorCount === 0) {
+      toast(`✓ Synced ${successCount} ${successCount === 1 ? 'event' : 'events'} to cloud`);
+    } else if (successCount > 0) {
+      toast(`⚠ Synced ${successCount} events, ${errorCount} failed`);
+    } else {
+      toast('✗ Sync failed. Check your connection.');
+    }
+  } finally {
+    ritalinSyncToCloudBtn.disabled = false;
+    ritalinSyncToCloudBtn.textContent = 'Sync to Cloud';
+  }
+}
+
+async function syncRitalinFromCloud() {
+  const token = getToken();
+  if (!token) { toast('Please set up cloud sync first'); return; }
+
+  try {
+    ritalinSyncFromCloudBtn.disabled = true;
+    ritalinSyncFromCloudBtn.textContent = 'Syncing...';
+
+    const response = await fetch(`${backendUrl}/ritalin-events`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) throw new Error('Token expired. Please reconnect.');
+      throw new Error('Failed to fetch events from cloud');
+    }
+
+    const data = await response.json();
+    const cloudEvents = data.events;
+
+    if (cloudEvents.length === 0) { toast('No data on cloud yet'); return; }
+
+    const localIds = new Set(ritalinEntries.map((e) => e.id));
+    const newEvents = cloudEvents.filter((e) => !localIds.has(e.id));
+
+    if (newEvents.length === 0) { toast('Already in sync'); return; }
+
+    ritalinEntries = [...ritalinEntries, ...newEvents];
+    saveRitalinEntries(ritalinEntries);
+    renderRitalinAll(ritalinEntries);
+    toast(`✓ Synced ${newEvents.length} new ${newEvents.length === 1 ? 'event' : 'events'} from cloud`);
+  } catch (error) {
+    toast(error.message || 'Sync failed. Check your connection.');
+  } finally {
+    ritalinSyncFromCloudBtn.disabled = false;
+    ritalinSyncFromCloudBtn.textContent = 'Sync from Cloud';
+  }
+}
+
+ritalinSyncToCloudBtn.addEventListener('click', syncRitalinToCloud);
+ritalinSyncFromCloudBtn.addEventListener('click', syncRitalinFromCloud);
+
+updateRitalinCountForDate();
+renderRitalinAll(ritalinEntries);
 
 const BASE_PATH = '/codex/';
 

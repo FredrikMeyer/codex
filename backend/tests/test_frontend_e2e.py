@@ -3,6 +3,7 @@ E2E tests for the frontend using Playwright.
 Tests the actual HTML/JS/CSS in a real browser.
 """
 
+import functools
 import http.server
 import os
 import socketserver
@@ -16,30 +17,30 @@ from app.main import create_app
 
 
 class FrontendServer(threading.Thread):
-    """Serve frontend files on a local port."""
+    """Serve frontend files on a dynamically assigned port."""
 
-    def __init__(self, port: int):
+    def __init__(self):
         super().__init__(daemon=True)
-        self.port = port
         self.frontend_dir = Path(__file__).parent.parent.parent / "frontend"
         self.httpd = None
-        self._shutdown_requested = False
+        self.port: int = 0
+        self._server_ready = threading.Event()
 
     def run(self):
-        """Start HTTP server in the frontend directory."""
-        handler = http.server.SimpleHTTPRequestHandler
+        """Start HTTP server serving the frontend directory."""
+        handler = functools.partial(
+            http.server.SimpleHTTPRequestHandler,
+            directory=str(self.frontend_dir),
+        )
+        socketserver.TCPServer.allow_reuse_address = True
+        self.httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
+        self.port = self.httpd.server_address[1]
+        self._server_ready.set()
+        self.httpd.serve_forever()
 
-        # Change to frontend directory
-        original_dir = os.getcwd()
-        try:
-            os.chdir(self.frontend_dir)
-
-            # Allow port reuse
-            socketserver.TCPServer.allow_reuse_address = True
-            self.httpd = socketserver.TCPServer(("", self.port), handler)
-            self.httpd.serve_forever()
-        finally:
-            os.chdir(original_dir)
+    def wait_until_started(self, timeout: float = 5.0) -> bool:
+        """Wait until the server socket is bound and ready."""
+        return self._server_ready.wait(timeout)
 
     def shutdown(self):
         """Stop the server."""
@@ -49,15 +50,14 @@ class FrontendServer(threading.Thread):
 
 
 class BackendServer(threading.Thread):
-    """Run the Flask backend on localhost:5000."""
+    """Run the Flask backend on a dynamically assigned port."""
 
-    def __init__(self, port: int, data_file: Path):
+    def __init__(self, data_file: Path):
         super().__init__(daemon=True)
-        self.port = port
         self.data_file = data_file
         self.server = None
-        self._shutdown_requested = False
-        self._started = threading.Event()
+        self.port: int = 0
+        self._server_ready = threading.Event()
 
     def run(self):
         """Start Flask server."""
@@ -67,18 +67,17 @@ class BackendServer(threading.Thread):
             app = create_app(self.data_file)
             app.config["TESTING"] = True
 
-            # Allow port reuse
-            socketserver.TCPServer.allow_reuse_address = True
-            self.server = make_server("127.0.0.1", self.port, app, threaded=True)
-            self._started.set()  # Signal that server is ready
+            self.server = make_server("127.0.0.1", 0, app, threaded=True)
+            self.port = self.server.port
+            self._server_ready.set()
             self.server.serve_forever()
         except Exception as e:
             print(f"Backend server failed to start: {e}")
-            self._started.set()  # Signal even on failure so we don't hang
+            self._server_ready.set()  # Signal even on failure so we don't hang
 
     def wait_until_started(self, timeout=5):
         """Wait for server to start."""
-        return self._started.wait(timeout)
+        return self._server_ready.wait(timeout)
 
     def shutdown(self):
         """Stop the server."""
@@ -89,15 +88,13 @@ class BackendServer(threading.Thread):
 @pytest.fixture(scope="module")
 def frontend_url():
     """Start a server for the frontend files."""
-    import time
-    port = 8080
-    server = FrontendServer(port)
+    server = FrontendServer()
     server.start()
 
-    # Wait for server to start
-    time.sleep(1)
+    if not server.wait_until_started(timeout=5):
+        raise RuntimeError("Frontend server failed to start")
 
-    url = f"http://localhost:{port}"
+    url = f"http://localhost:{server.port}"
     yield url
 
     server.shutdown()
@@ -109,37 +106,29 @@ def backend_url(tmp_path_factory):
     import requests
     import time
 
-    # Use port 5555 to avoid conflict with macOS ControlCenter on port 5000
-    port = 5555
+    # Allow all origins so CORS is not a concern in tests
+    os.environ["ALLOWED_ORIGINS"] = "*"
 
-    # Ensure CORS is configured for frontend origin before server starts
-    os.environ["ALLOWED_ORIGINS"] = "http://localhost:8080"
-
-    # Also ensure no .env file interferes
     if "PRODUCTION" in os.environ:
         del os.environ["PRODUCTION"]
 
     tmp_path = tmp_path_factory.mktemp("backend_data")
     data_file = tmp_path / "data.json"
 
-    server = BackendServer(port, data_file)
+    server = BackendServer(data_file)
     server.start()
 
-    # Wait for server to start
     if not server.wait_until_started(timeout=5):
         raise RuntimeError("Backend server failed to start")
 
-    # Give it a moment to fully initialize
-    time.sleep(1)
+    url = f"http://localhost:{server.port}"
 
-    url = f"http://localhost:{port}"
-
-    # Verify server is responding by trying generate-code endpoint
+    # Verify server is responding
     max_retries = 15
     for i in range(max_retries):
         try:
             response = requests.post(f"{url}/generate-code", timeout=2)
-            if response.status_code in [200, 429]:  # 200 OK or 429 Rate Limited - both mean server is up
+            if response.status_code in [200, 429]:
                 break
         except requests.exceptions.ConnectionError:
             if i < max_retries - 1:
@@ -322,7 +311,7 @@ def test_delete_entry(page: Page, frontend_url: str):
     delete_btn.click()
 
     # Entry should be removed
-    expect(page.locator(".entries")).to_contain_text("No history yet")
+    expect(page.locator("#entries")).to_contain_text("No history yet")
 
 
 def test_reset_day(page: Page, frontend_url: str):

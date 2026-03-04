@@ -11,7 +11,7 @@ from typing import Any, Dict
 
 def default_data() -> Dict[str, Any]:
     """Return the default data structure for a new storage file."""
-    return {"codes": [], "logs": []}
+    return {"codes": [], "logs": [], "ritalin_events": []}
 
 
 def ensure_data_file(path: Path) -> None:

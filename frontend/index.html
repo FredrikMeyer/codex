@@ -18,100 +18,154 @@
   </header>
 
   <main>
-    <section class="card">
-      <div class="field-row">
-        <div class="field">
-          <label for="usage-date">Date</label>
-          <input type="date" id="usage-date" required>
-        </div>
+    <nav class="tab-bar" role="tablist">
+      <button class="tab active" data-tab="asthma" role="tab" aria-selected="true">Asthma</button>
+      <button class="tab" data-tab="ritalin" role="tab" aria-selected="false">Ritalin</button>
+    </nav>
 
-        <div class="field">
-          <label>Medicine Type</label>
-          <div class="medicine-type-selector">
-            <button class="medicine-type" data-type="spray">Spray</button>
-            <button class="medicine-type" data-type="ventoline">Ventoline</button>
+    <div class="tab-panel" data-panel="asthma">
+      <section class="card">
+        <div class="field-row">
+          <div class="field">
+            <label for="usage-date">Date</label>
+            <input type="date" id="usage-date" required>
           </div>
-          <button id="preventive-toggle" class="preventive-toggle">Preventivt</button>
-        </div>
-      </div>
 
-      <div class="field">
-        <label>Counter</label>
-        <div class="counter" aria-live="polite">
-          <button id="decrement" aria-label="Decrease usage">−</button>
-          <div class="count" id="count">0</div>
-          <button id="increment" aria-label="Increase usage">+</button>
-        </div>
-        <p class="hint">Track how many doses you used for the selected day.</p>
-      </div>
-
-      <div class="actions">
-        <button class="primary" id="save">Log usage</button>
-        <button class="ghost" id="reset-day">Reset day</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="section-heading">
-        <div>
-          <div class="label">Cloud Sync</div>
-          <div class="subtitle">Optional backup to secure cloud storage.</div>
-        </div>
-      </div>
-
-      <div id="sync-status" class="sync-status">
-        <div class="status-indicator">
-          <div class="status-dot"></div>
-          <span id="sync-status-text">Not configured</span>
-        </div>
-      </div>
-
-      <div id="sync-setup" class="sync-setup">
-        <div class="setup-step">
-          <p class="hint">Option 1: Generate a new code</p>
-          <button id="generate-code" class="ghost">Generate Code</button>
-          <div id="generated-code" class="code-display"></div>
-        </div>
-
-        <div class="setup-step">
-          <p class="hint">Option 2: Enter an existing code (6 characters)</p>
-          <div class="code-input-group">
-            <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
-            <button id="complete-setup" class="primary">Complete Setup</button>
+          <div class="field">
+            <label>Medicine Type</label>
+            <div class="medicine-type-selector">
+              <button class="medicine-type" data-type="spray">Spray</button>
+              <button class="medicine-type" data-type="ventoline">Ventoline</button>
+            </div>
+            <button id="preventive-toggle" class="preventive-toggle">Preventivt</button>
           </div>
         </div>
-      </div>
 
-      <div id="sync-configured" class="sync-configured" style="display: none;">
-        <p class="hint">Your device is connected to cloud storage.</p>
-        <div class="button-group">
-          <button id="show-code" class="ghost">Show My Code</button>
-          <button id="disconnect-sync" class="ghost">Disconnect</button>
-          <button id="clear-local-data" class="ghost danger">Clear local data</button>
+        <div class="field">
+          <label>Counter</label>
+          <div class="counter" aria-live="polite">
+            <button id="decrement" aria-label="Decrease usage">−</button>
+            <div class="count" id="count">0</div>
+            <button id="increment" aria-label="Increase usage">+</button>
+          </div>
+          <p class="hint">Track how many doses you used for the selected day.</p>
         </div>
-      </div>
-    </section>
 
-    <section class="card" id="trends-card">
-      <div class="label">Trends</div>
-      <div class="subtitle">Last 30 days of usage.</div>
-      <div id="chart"></div>
-    </section>
+        <div class="actions">
+          <button class="primary" id="save">Log usage</button>
+          <button class="ghost" id="reset-day">Reset day</button>
+        </div>
+      </section>
 
-    <section class="card">
-      <div class="section-heading">
-        <div>
-          <div class="label">History</div>
-          <div class="subtitle">Stored on this device for offline access.</div>
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <div class="label">Cloud Sync</div>
+            <div class="subtitle">Optional backup to secure cloud storage.</div>
+          </div>
         </div>
-        <div class="button-group">
-          <button id="sync-from-cloud" class="primary" style="display: none;">Sync from Cloud</button>
-          <button id="sync-to-cloud" class="primary" style="display: none;">Sync to Cloud</button>
-          <button id="export" class="ghost">Export CSV</button>
+
+        <div id="sync-status" class="sync-status">
+          <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span id="sync-status-text">Not configured</span>
+          </div>
         </div>
-      </div>
-      <div id="entries" class="entries" aria-live="polite"></div>
-    </section>
+
+        <div id="sync-setup" class="sync-setup">
+          <div class="setup-step">
+            <p class="hint">Option 1: Generate a new code</p>
+            <button id="generate-code" class="ghost">Generate Code</button>
+            <div id="generated-code" class="code-display"></div>
+          </div>
+
+          <div class="setup-step">
+            <p class="hint">Option 2: Enter an existing code (6 characters)</p>
+            <div class="code-input-group">
+              <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
+              <button id="complete-setup" class="primary">Complete Setup</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="sync-configured" class="sync-configured" style="display: none;">
+          <p class="hint">Your device is connected to cloud storage.</p>
+          <div class="button-group">
+            <button id="show-code" class="ghost">Show My Code</button>
+            <button id="disconnect-sync" class="ghost">Disconnect</button>
+            <button id="clear-local-data" class="ghost danger">Clear local data</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="trends-card">
+        <div class="label">Trends</div>
+        <div class="subtitle">Last 30 days of usage.</div>
+        <div id="chart"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <div class="label">History</div>
+            <div class="subtitle">Stored on this device for offline access.</div>
+          </div>
+          <div class="button-group">
+            <button id="sync-from-cloud" class="primary" style="display: none;">Sync from Cloud</button>
+            <button id="sync-to-cloud" class="primary" style="display: none;">Sync to Cloud</button>
+            <button id="export" class="ghost">Export CSV</button>
+          </div>
+        </div>
+        <div id="entries" class="entries" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <div class="tab-panel" data-panel="ritalin" hidden>
+      <section class="card">
+        <div class="field-row">
+          <div class="field">
+            <label for="ritalin-date">Date</label>
+            <input type="date" id="ritalin-date" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Doses</label>
+          <div class="counter" aria-live="polite">
+            <button id="ritalin-decrement" aria-label="Decrease doses">−</button>
+            <div class="count" id="ritalin-count">0</div>
+            <button id="ritalin-increment" aria-label="Increase doses">+</button>
+          </div>
+          <p class="hint">Track how many doses you took for the selected day.</p>
+        </div>
+
+        <div class="actions">
+          <button class="primary ritalin-primary" id="ritalin-save">Log doses</button>
+          <button class="ghost" id="ritalin-reset-day">Reset day</button>
+        </div>
+      </section>
+
+      <section class="card" id="ritalin-trends-card">
+        <div class="label">Trends</div>
+        <div class="subtitle">Last 30 days of doses.</div>
+        <div id="ritalin-chart"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <div class="label">History</div>
+            <div class="subtitle">Stored on this device for offline access.</div>
+          </div>
+          <div class="button-group">
+            <button id="ritalin-sync-from-cloud" class="primary ritalin-primary" style="display: none;">Sync from Cloud</button>
+            <button id="ritalin-sync-to-cloud" class="primary ritalin-primary" style="display: none;">Sync to Cloud</button>
+            <button id="ritalin-export" class="ghost">Export CSV</button>
+          </div>
+        </div>
+        <div id="ritalin-entries" class="entries" aria-live="polite"></div>
+      </section>
+    </div>
   </main>
 
   <div id="toast" role="status" aria-live="polite"></div>
