@@ -42,11 +42,12 @@ export async function apiUploadEvents(token, events) {
   let successCount = 0;
   let errorCount = 0;
   for (const event of events) {
+    const { received_at: _received_at, ...eventData } = event;
     try {
       const response = await fetch(`${backendUrl}/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ event })
+        body: JSON.stringify({ event: eventData })
       });
       if (response.ok) {
         successCount++;
@@ -80,11 +81,12 @@ export async function apiUploadRitalinEvents(token, events) {
   let successCount = 0;
   let errorCount = 0;
   for (const event of events) {
+    const { received_at: _received_at, ...eventData } = event;
     try {
       const response = await fetch(`${backendUrl}/ritalin-events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ event })
+        body: JSON.stringify({ event: eventData })
       });
       if (response.ok) {
         successCount++;

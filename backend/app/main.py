@@ -358,8 +358,6 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         if not isinstance(event, dict):
             return jsonify({"error": "'event' (object) is required"}), 400
 
-        event = {k: v for k, v in event.items() if k != "received_at"}
-
         try:
             AsthmaMedicineEvent(**event)
         except ValidationError as e:
@@ -428,8 +426,6 @@ def create_app(data_file: str | Path | None = None) -> Flask:
 
         if not isinstance(event, dict):
             return jsonify({"error": "'event' (object) is required"}), 400
-
-        event = {k: v for k, v in event.items() if k != "received_at"}
 
         try:
             RitalinEvent(**event)
