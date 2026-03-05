@@ -1,35 +1,8 @@
-// Backend Configuration
-// Allow override via window.backendUrl for testing
-const backendUrl = window.backendUrl || (window.location.hostname === 'localhost'
-  ? 'http://localhost:5001'  // Use 5001 to avoid macOS AirPlay on port 5000
-  : 'https://asthma.fredrikmeyer.net');
-
-// Storage keys
-const storageKey = 'asthma-usage-entries';
-const lastTypeKey = 'asthma-last-medicine-type';
-const tokenKey = 'asthma-auth-token';
-const RITALIN_KEY = 'ritalin-usage-entries';
-
-// Token management functions
-function getToken() {
-  return localStorage.getItem(tokenKey);
-}
-
-function setToken(token) {
-  if (!token) {
-    throw new Error('Token cannot be empty');
-  }
-  localStorage.setItem(tokenKey, token);
-}
-
-function clearToken() {
-  localStorage.removeItem(tokenKey);
-}
-
-function hasToken() {
-  const token = getToken();
-  return token !== null && token !== '';
-}
+import { lastTypeKey } from './config.js';
+import { generateId, createTimestamp, sumForType, migrateToEventLog, smartMerge } from './tracker.js';
+import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries, getToken, setToken, clearToken, hasToken } from './storage.js';
+import { apiGenerateCode, apiGenerateToken, apiFetchCode, apiUploadEvents, apiDownloadEvents, apiUploadRitalinEvents, apiDownloadRitalinEvents } from './api.js';
+import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, updateSyncStatus as renderSyncStatus } from './ui.js';
 
 // DOM elements
 const usageDate = document.getElementById('usage-date');
@@ -41,8 +14,6 @@ const resetBtn = document.getElementById('reset-day');
 const exportBtn = document.getElementById('export');
 const syncFromCloudBtn = document.getElementById('sync-from-cloud');
 const syncToCloudBtn = document.getElementById('sync-to-cloud');
-const entriesEl = document.getElementById('entries');
-const toastEl = document.getElementById('toast');
 const medicineTypeButtons = document.querySelectorAll('.medicine-type');
 const preventiveBtn = document.getElementById('preventive-toggle');
 
@@ -52,185 +23,15 @@ usageDate.valueAsDate = today;
 let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
 let preventive = false;
 
-function generateId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
-}
-
-function createTimestamp(dateValue) {
-  const today = new Date().toISOString().slice(0, 10);
-  return dateValue === today ? new Date().toISOString() : dateValue + 'T12:00:00.000Z';
-}
-
-function getEventsForDate(events, date) {
-  return events.filter((e) => e.date === date);
-}
-
-function sumForType(events, date, type) {
-  return getEventsForDate(events, date)
-    .filter((e) => e.type === type)
-    .reduce((sum, e) => sum + e.count, 0);
-}
-
-function aggregateByDate(events, days = 30) {
-  const now = new Date();
-  const result = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const date = d.toISOString().slice(0, 10);
-    const spray = sumForType(events, date, 'spray');
-    const ventoline = sumForType(events, date, 'ventoline');
-    if (spray > 0 || ventoline > 0) {
-      result.push({ date, spray, ventoline });
-    }
-  }
-  return result;
-}
-
-function loadEntries() {
-  const raw = localStorage.getItem(storageKey);
-  try {
-    return raw ? JSON.parse(raw) : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-// One-time migration: convert old date-keyed format to flat event array
-function migrateToEventLog(data) {
-  const migrationKey = 'asthma-migrated-v2';
-  if (localStorage.getItem(migrationKey)) {
-    return data;
-  }
-
-  // Already an array means nothing to convert
-  if (Array.isArray(data)) {
-    localStorage.setItem(migrationKey, 'true');
-    return data;
-  }
-
-  // Convert date-keyed object to event array
-  const events = [];
-  for (const [date, value] of Object.entries(data)) {
-    let spray = 0;
-    let ventoline = 0;
-    if (typeof value === 'number') {
-      ventoline = value;
-    } else if (value && typeof value === 'object') {
-      spray = value.spray || 0;
-      ventoline = value.ventoline || 0;
-    }
-    if (spray > 0) {
-      events.push({ id: generateId(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
-    }
-    if (ventoline > 0) {
-      events.push({ id: generateId(), date, timestamp: date + 'T12:00:01.000Z', type: 'ventoline', count: ventoline, preventive: false });
-    }
-  }
-
-  localStorage.setItem(migrationKey, 'true');
-  return events;
-}
-
-function saveEntries(entries) {
-  localStorage.setItem(storageKey, JSON.stringify(entries));
-}
-
-function render(events) {
-  entriesEl.innerHTML = '';
-  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => new Date(b) - new Date(a));
-  if (!dates.length) {
-    entriesEl.innerHTML = '<div class="hint">No history yet. Save your first day.</div>';
-    return;
-  }
-  for (const date of dates) {
-    const item = document.createElement('div');
-    item.className = 'entry';
-    const sprayTotal = sumForType(events, date, 'spray');
-    const ventolineTotal = sumForType(events, date, 'ventoline');
-    const total = sprayTotal + ventolineTotal;
-    const breakdown = [];
-    if (sprayTotal > 0) breakdown.push(`Spray: ${sprayTotal}`);
-    if (ventolineTotal > 0) breakdown.push(`Ventoline: ${ventolineTotal}`);
-    const countText = breakdown.length > 0
-      ? `${total} doses <span class="breakdown">(${breakdown.join(', ')})</span>`
-      : `${total} doses`;
-    item.innerHTML = `<div><div class="date">${date}</div><div class="count">${countText}</div></div>`;
-    const del = document.createElement('button');
-    del.textContent = 'Delete';
-    del.className = 'ghost';
-    del.addEventListener('click', () => {
-      entries = entries.filter((e) => e.date !== date);
-      saveEntries(entries);
-      renderAll(entries);
-      toast('Entry removed');
-    });
-    item.appendChild(del);
-    entriesEl.appendChild(item);
-  }
-}
-
-function renderChart(events) {
-  const chartEl = document.getElementById('chart');
-  const data = aggregateByDate(events);
-
-  if (data.length === 0) {
-    chartEl.innerHTML = '<div class="hint">No data yet.</div>';
-    return;
-  }
-
-  const WIDTH = 600;
-  const HEIGHT = 180;
-  const PAD_LEFT = 20;
-  const PAD_RIGHT = 10;
-  const PAD_TOP = 10;
-  const PAD_BOTTOM = 30;
-  const chartWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
-  const chartHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
-
-  const maxDoses = Math.max(...data.map((d) => d.spray + d.ventoline));
-  const barGroupWidth = chartWidth / data.length;
-  const barWidth = Math.min(barGroupWidth * 0.35, 18);
-  const gap = barWidth * 0.3;
-  const barH = (value) => (value / maxDoses) * chartHeight;
-  const barY = (value) => PAD_TOP + chartHeight - barH(value);
-  const labelStep = Math.max(1, Math.ceil(data.length / 8));
-
-  const elements = data.flatMap((d, i) => {
-    const cx = PAD_LEFT + i * barGroupWidth + barGroupWidth / 2;
-    const sprayX = cx - barWidth - gap / 2;
-    const ventX = cx + gap / 2;
-    const parts = [];
-    if (d.spray > 0) {
-      parts.push(`<rect class="bar-spray" x="${sprayX.toFixed(1)}" y="${barY(d.spray).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.spray).toFixed(1)}"><title>Spray: ${d.spray}</title></rect>`);
-    }
-    if (d.ventoline > 0) {
-      parts.push(`<rect class="bar-ventoline" x="${ventX.toFixed(1)}" y="${barY(d.ventoline).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.ventoline).toFixed(1)}"><title>Ventoline: ${d.ventoline}</title></rect>`);
-    }
-    if (i % labelStep === 0) {
-      const date = new Date(d.date + 'T12:00:00Z');
-      const label = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
-      parts.push(`<text class="axis-label" x="${cx.toFixed(1)}" y="${(HEIGHT - 8).toFixed(1)}" text-anchor="middle">${label}</text>`);
-    }
-    return parts;
-  });
-
-  const gridLine = `<line class="grid-line" x1="${PAD_LEFT}" y1="${PAD_TOP}" x2="${WIDTH - PAD_RIGHT}" y2="${PAD_TOP}"/>`;
-  chartEl.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">${gridLine}${elements.join('')}</svg>`;
-}
 
 function renderAll(events) {
-  render(events);
-  renderChart(events);
-}
-
-function toast(message) {
-  toastEl.textContent = message;
-  toastEl.classList.add('show');
-  setTimeout(() => toastEl.classList.remove('show'), 1800);
+  renderAsthmaHistory(events, (date) => {
+    entries = entries.filter((e) => e.date !== date);
+    saveEntries(entries);
+    renderAll(entries);
+    toast('Entry removed');
+  });
+  renderAsthmaChart(events);
 }
 
 function formatDate(value) {
@@ -252,8 +53,12 @@ function resetPreventive() {
 }
 
 let entries = loadEntries();
-entries = migrateToEventLog(entries);
-saveEntries(entries); // Save migrated data
+const migrationKey = 'asthma-migrated-v2';
+if (!localStorage.getItem(migrationKey)) {
+  entries = migrateToEventLog(entries);
+  localStorage.setItem(migrationKey, 'true');
+  saveEntries(entries);
+}
 
 // Set active medicine type button based on stored preference
 medicineTypeButtons.forEach((btn) => {
@@ -348,28 +153,11 @@ const disconnectBtn = document.getElementById('disconnect-sync');
 const clearLocalDataBtn = document.getElementById('clear-local-data');
 const showCodeBtn = document.getElementById('show-code');
 
-// Update sync status UI
 function updateSyncStatus() {
-  const isConfigured = hasToken();
-  if (isConfigured) {
-    syncStatusText.textContent = 'Connected';
-    syncStatusDot.classList.add('connected');
-    syncSetupSection.style.display = 'none';
-    syncConfiguredSection.style.display = 'block';
-    syncFromCloudBtn.style.display = 'block';
-    syncToCloudBtn.style.display = 'block';
-    ritalinSyncFromCloudBtn.style.display = 'block';
-    ritalinSyncToCloudBtn.style.display = 'block';
-  } else {
-    syncStatusText.textContent = 'Not configured';
-    syncStatusDot.classList.remove('connected');
-    syncSetupSection.style.display = 'block';
-    syncConfiguredSection.style.display = 'none';
-    syncFromCloudBtn.style.display = 'none';
-    syncToCloudBtn.style.display = 'none';
-    ritalinSyncFromCloudBtn.style.display = 'none';
-    ritalinSyncToCloudBtn.style.display = 'none';
-  }
+  renderSyncStatus(hasToken(), {
+    syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
+    syncFromCloudBtn, syncToCloudBtn, ritalinSyncFromCloudBtn, ritalinSyncToCloudBtn
+  });
 }
 
 // Generate setup code from backend
@@ -378,16 +166,7 @@ async function generateCode() {
     generateCodeBtn.disabled = true;
     generateCodeBtn.textContent = 'Generating...';
 
-    const response = await fetch(`${backendUrl}/generate-code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate code');
-    }
-
-    const data = await response.json();
+    const data = await apiGenerateCode();
     generatedCodeDisplay.textContent = data.code;
     generatedCodeDisplay.classList.add('show');
     toast('Code generated! Enter it below to complete setup.');
@@ -417,18 +196,7 @@ async function completeSetup() {
     completeSetupBtn.disabled = true;
     completeSetupBtn.textContent = 'Connecting...';
 
-    const response = await fetch(`${backendUrl}/generate-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Invalid code');
-    }
-
-    const data = await response.json();
+    const data = await apiGenerateToken(code);
     setToken(data.token);
 
     // Clear UI
@@ -476,40 +244,26 @@ async function showCode() {
   }
 
   try {
-    const response = await fetch(`${backendUrl}/code`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        toast('Session expired. Please reconnect.');
-        clearToken();
-        updateSyncStatus();
-        return;
-      }
-      throw new Error('Failed to retrieve code');
-    }
-
-    const data = await response.json();
+    const data = await apiFetchCode(token);
     const code = data.code;
 
-    // Try to copy to clipboard
     if (navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(code);
         toast(`Your code: ${code} (copied to clipboard!)`);
-      } catch (clipboardError) {
-        // Fallback if clipboard fails
+      } catch (_) {
         toast(`Your code: ${code}`);
       }
     } else {
-      // Fallback for browsers without clipboard API
       toast(`Your code: ${code}`);
     }
   } catch (error) {
+    if (error.status === 401) {
+      toast('Session expired. Please reconnect.');
+      clearToken();
+      updateSyncStatus();
+      return;
+    }
     toast('Failed to retrieve code. Check your connection.');
     console.error('Show code error:', error);
   }
@@ -532,31 +286,7 @@ async function syncToCloud() {
     syncToCloudBtn.disabled = true;
     syncToCloudBtn.textContent = 'Syncing...';
 
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const event of entries) {
-      try {
-        const response = await fetch(`${backendUrl}/events`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ event })
-        });
-
-        if (response.ok) {
-          successCount++;
-        } else {
-          errorCount++;
-          console.error(`Failed to sync event ${event.id}:`, await response.text());
-        }
-      } catch (error) {
-        errorCount++;
-        console.error(`Network error syncing event ${event.id}:`, error);
-      }
-    }
+    const { successCount, errorCount } = await apiUploadEvents(token, entries);
 
     if (errorCount === 0) {
       toast(`✓ Synced ${successCount} ${successCount === 1 ? 'event' : 'events'} to cloud`);
@@ -586,21 +316,7 @@ async function syncFromCloud() {
     syncFromCloudBtn.disabled = true;
     syncFromCloudBtn.textContent = 'Syncing...';
 
-    const response = await fetch(`${backendUrl}/events`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Token expired. Please reconnect.');
-      }
-      throw new Error('Failed to fetch events from cloud');
-    }
-
-    const data = await response.json();
+    const data = await apiDownloadEvents(token);
     const cloudEvents = data.events;
 
     if (cloudEvents.length === 0) {
@@ -608,43 +324,19 @@ async function syncFromCloud() {
       return;
     }
 
-    const localIds = new Set(entries.map((e) => e.id));
-    const unmatched = cloudEvents.filter((e) => !localIds.has(e.id));
+    const { entries: merged, newCount, idUpdates } = smartMerge(entries, cloudEvents);
 
-    if (unmatched.length === 0) {
+    if (newCount === 0 && idUpdates === 0) {
       toast('Already in sync');
       return;
     }
 
-    // For each unmatched cloud event, check if a functionally equivalent
-    // local event exists (same date/type/count/preventive but different ID).
-    // If so, update the local ID to the cloud ID to align future syncs.
-    // Otherwise treat it as genuinely new.
-    const matchedLocalIndices = new Set();
-    const trulyNew = [];
-
-    for (const cloudEvent of unmatched) {
-      const localIdx = entries.findIndex(
-        (e, i) => !matchedLocalIndices.has(i) &&
-                   e.date === cloudEvent.date &&
-                   e.type === cloudEvent.type &&
-                   e.count === cloudEvent.count &&
-                   Boolean(e.preventive) === Boolean(cloudEvent.preventive)
-      );
-      if (localIdx !== -1) {
-        matchedLocalIndices.add(localIdx);
-        entries[localIdx] = { ...entries[localIdx], id: cloudEvent.id };
-      } else {
-        trulyNew.push(cloudEvent);
-      }
-    }
-
-    entries = [...entries, ...trulyNew];
+    entries = merged;
     saveEntries(entries);
     renderAll(entries);
 
-    if (trulyNew.length > 0) {
-      toast(`✓ Synced ${trulyNew.length} new ${trulyNew.length === 1 ? 'event' : 'events'} from cloud`);
+    if (newCount > 0) {
+      toast(`✓ Synced ${newCount} new ${newCount === 1 ? 'event' : 'events'} from cloud`);
     } else {
       toast('Already in sync');
     }
@@ -699,108 +391,13 @@ tabButtons.forEach((btn) => {
   });
 });
 
-// --- Ritalin storage ---
-function loadRitalinEntries() {
-  const raw = localStorage.getItem(RITALIN_KEY);
-  try {
-    return raw ? JSON.parse(raw) : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function saveRitalinEntries(entries) {
-  localStorage.setItem(RITALIN_KEY, JSON.stringify(entries));
-}
-
-// --- Ritalin aggregation ---
-function aggregateRitalinByDate(events, days = 30) {
-  const now = new Date();
-  const result = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const date = d.toISOString().slice(0, 10);
-    const count = events
-      .filter((e) => e.date === date)
-      .reduce((sum, e) => sum + e.count, 0);
-    if (count > 0) result.push({ date, count });
-  }
-  return result;
-}
-
-// --- Ritalin chart ---
-function renderRitalinChart(events) {
-  const chartEl = document.getElementById('ritalin-chart');
-  const data = aggregateRitalinByDate(events);
-
-  if (data.length === 0) {
-    chartEl.innerHTML = '<div class="hint">No data yet.</div>';
-    return;
-  }
-
-  const WIDTH = 600;
-  const HEIGHT = 180;
-  const PAD_LEFT = 20;
-  const PAD_RIGHT = 10;
-  const PAD_TOP = 10;
-  const PAD_BOTTOM = 30;
-  const chartWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
-  const chartHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
-
-  const maxDoses = Math.max(...data.map((d) => d.count));
-  const barGroupWidth = chartWidth / data.length;
-  const barWidth = Math.min(barGroupWidth * 0.6, 24);
-  const barH = (value) => (value / maxDoses) * chartHeight;
-  const barY = (value) => PAD_TOP + chartHeight - barH(value);
-  const labelStep = Math.max(1, Math.ceil(data.length / 8));
-
-  const elements = data.flatMap((d, i) => {
-    const cx = PAD_LEFT + i * barGroupWidth + barGroupWidth / 2;
-    const parts = [];
-    parts.push(`<rect class="bar-ritalin" x="${(cx - barWidth / 2).toFixed(1)}" y="${barY(d.count).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.count).toFixed(1)}"><title>Doses: ${d.count}</title></rect>`);
-    if (i % labelStep === 0) {
-      const date = new Date(d.date + 'T12:00:00Z');
-      const label = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
-      parts.push(`<text class="axis-label" x="${cx.toFixed(1)}" y="${(HEIGHT - 8).toFixed(1)}" text-anchor="middle">${label}</text>`);
-    }
-    return parts;
-  });
-
-  const gridLine = `<line class="grid-line" x1="${PAD_LEFT}" y1="${PAD_TOP}" x2="${WIDTH - PAD_RIGHT}" y2="${PAD_TOP}"/>`;
-  chartEl.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">${gridLine}${elements.join('')}</svg>`;
-}
-
-// --- Ritalin history ---
-function renderRitalinEntries(events) {
-  const entriesEl = document.getElementById('ritalin-entries');
-  entriesEl.innerHTML = '';
-  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => new Date(b) - new Date(a));
-  if (!dates.length) {
-    entriesEl.innerHTML = '<div class="hint">No history yet. Log your first dose.</div>';
-    return;
-  }
-  for (const date of dates) {
-    const total = events.filter((e) => e.date === date).reduce((sum, e) => sum + e.count, 0);
-    const item = document.createElement('div');
-    item.className = 'entry';
-    item.innerHTML = `<div><div class="date">${date}</div><div class="count">${total} ${total === 1 ? 'dose' : 'doses'}</div></div>`;
-    const del = document.createElement('button');
-    del.textContent = 'Delete';
-    del.className = 'ghost';
-    del.addEventListener('click', () => {
-      ritalinEntries = ritalinEntries.filter((e) => e.date !== date);
-      saveRitalinEntries(ritalinEntries);
-      renderRitalinAll(ritalinEntries);
-      toast('Entry removed');
-    });
-    item.appendChild(del);
-    entriesEl.appendChild(item);
-  }
-}
-
 function renderRitalinAll(events) {
-  renderRitalinEntries(events);
+  renderRitalinHistory(events, (date) => {
+    ritalinEntries = ritalinEntries.filter((e) => e.date !== date);
+    saveRitalinEntries(ritalinEntries);
+    renderRitalinAll(ritalinEntries);
+    toast('Entry removed');
+  });
   renderRitalinChart(events);
 }
 
@@ -883,19 +480,7 @@ async function syncRitalinToCloud() {
     ritalinSyncToCloudBtn.disabled = true;
     ritalinSyncToCloudBtn.textContent = 'Syncing...';
 
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const event of ritalinEntries) {
-      try {
-        const response = await fetch(`${backendUrl}/ritalin-events`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ event })
-        });
-        if (response.ok) { successCount++; } else { errorCount++; }
-      } catch (_) { errorCount++; }
-    }
+    const { successCount, errorCount } = await apiUploadRitalinEvents(token, ritalinEntries);
 
     if (errorCount === 0) {
       toast(`✓ Synced ${successCount} ${successCount === 1 ? 'event' : 'events'} to cloud`);
@@ -918,17 +503,7 @@ async function syncRitalinFromCloud() {
     ritalinSyncFromCloudBtn.disabled = true;
     ritalinSyncFromCloudBtn.textContent = 'Syncing...';
 
-    const response = await fetch(`${backendUrl}/ritalin-events`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) throw new Error('Token expired. Please reconnect.');
-      throw new Error('Failed to fetch events from cloud');
-    }
-
-    const data = await response.json();
+    const data = await apiDownloadRitalinEvents(token);
     const cloudEvents = data.events;
 
     if (cloudEvents.length === 0) { toast('No data on cloud yet'); return; }

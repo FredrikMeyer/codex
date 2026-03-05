@@ -45,6 +45,20 @@ echo -e "${BLUE}║     Codex Test Suite              ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════╝${NC}"
 echo ""
 
+echo -e "${YELLOW}🧪 Running JS unit tests${NC}"
+echo ""
+node --test frontend/test/*.test.js
+JS_EXIT_CODE=$?
+if [ $JS_EXIT_CODE -eq 0 ]; then
+    echo ""
+    echo -e "${GREEN}✓ JS unit tests passed!${NC}"
+else
+    echo ""
+    echo -e "${RED}✗ JS unit tests failed${NC}"
+    exit $JS_EXIT_CODE
+fi
+echo ""
+
 cd backend
 
 case "$1" in

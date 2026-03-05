@@ -1,9 +1,15 @@
-const CACHE = 'asthma-tracker-v14';
+const CACHE = 'asthma-tracker-v15';
 const ASSET_PATHS = [
   '.',
   'index.html',
   'styles.css',
   'app.js',
+  'config.js',
+  'tracker.js',
+  'storage.js',
+  'api.js',
+  'charts.js',
+  'ui.js',
   'manifest.webmanifest'
 ];
 const BASE_URL = self.location.href.replace(/service-worker\\.js(?:\\?.*)?$/, '');
