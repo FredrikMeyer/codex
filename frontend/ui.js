@@ -53,10 +53,15 @@ export function renderRitalinHistory(events, onDeleteDate) {
     return;
   }
   for (const date of dates) {
-    const total = events.filter((e) => e.date === date).reduce((sum, e) => sum + e.count, 0);
+    const dayEvents = events.filter((e) => e.date === date);
+    const total = dayEvents.reduce((sum, e) => sum + e.count, 0);
+    const times = dayEvents
+      .filter((e) => e.timestamp)
+      .map((e) => new Date(e.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))
+      .join(', ');
     const item = document.createElement('div');
     item.className = 'entry';
-    item.innerHTML = `<div><div class="date">${date}</div><div class="count">${total} ${total === 1 ? 'dose' : 'doses'}</div></div>`;
+    item.innerHTML = `<div><div class="date">${date}</div><div class="count">${total} ${total === 1 ? 'dose' : 'doses'}${times ? ` <span class="breakdown">(${times})</span>` : ''}</div></div>`;
     const del = document.createElement('button');
     del.textContent = 'Delete';
     del.className = 'ghost';
