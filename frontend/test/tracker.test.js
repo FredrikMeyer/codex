@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry } from '../tracker.js';
 
 test('generateId returns a non-empty string', () => {
   const id = generateId();
@@ -177,4 +177,25 @@ test('migrateToEventLog skips zero counts', () => {
   const result = migrateToEventLog(input, () => 'test-id');
   assert.equal(result.length, 1);
   assert.equal(result[0].type, 'ventoline');
+});
+
+test('updateEntry replaces the entry with the matching id', () => {
+  const entries = [
+    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false },
+    { id: 'b', date: '2024-01-02', type: 'spray', count: 1, preventive: false }
+  ];
+  const result = updateEntry(entries, { id: 'a', date: '2024-01-01', type: 'spray', count: 3, preventive: true });
+  assert.equal(result[0].type, 'spray');
+  assert.equal(result[0].count, 3);
+  assert.equal(result[0].preventive, true);
+  assert.equal(result[1].id, 'b');
+  assert.equal(result.length, 2);
+});
+
+test('updateEntry returns unchanged array when id not found', () => {
+  const entries = [
+    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
+  ];
+  const result = updateEntry(entries, { id: 'z', date: '2024-01-01', type: 'spray', count: 1, preventive: false });
+  assert.deepEqual(result, entries);
 });

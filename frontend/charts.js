@@ -36,8 +36,7 @@ export function buildAsthmaChartSvg(events) {
       parts.push(`<rect class="bar-ventoline" x="${ventX.toFixed(1)}" y="${barY(d.ventoline).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.ventoline).toFixed(1)}"><title>Ventoline: ${d.ventoline}</title></rect>`);
     }
     if (i % labelStep === 0) {
-      const date = new Date(d.date + 'T12:00:00Z');
-      const label = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+      const label = Temporal.PlainDate.from(d.date).toLocaleString('en-GB', { month: 'short', day: 'numeric' });
       parts.push(`<text class="axis-label" x="${cx.toFixed(1)}" y="${(HEIGHT - 8).toFixed(1)}" text-anchor="middle">${label}</text>`);
     }
     return parts;
@@ -75,8 +74,7 @@ export function buildRitalinChartSvg(events) {
     const parts = [];
     parts.push(`<rect class="bar-ritalin" x="${(cx - barWidth / 2).toFixed(1)}" y="${barY(d.count).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.count).toFixed(1)}"><title>Doses: ${d.count}</title></rect>`);
     if (i % labelStep === 0) {
-      const date = new Date(d.date + 'T12:00:00Z');
-      const label = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+      const label = Temporal.PlainDate.from(d.date).toLocaleString('en-GB', { month: 'short', day: 'numeric' });
       parts.push(`<text class="axis-label" x="${cx.toFixed(1)}" y="${(HEIGHT - 8).toFixed(1)}" text-anchor="middle">${label}</text>`);
     }
     return parts;

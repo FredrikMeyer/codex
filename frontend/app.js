@@ -1,5 +1,5 @@
 import { lastTypeKey } from './config.js';
-import { generateId, createTimestamp, sumForType, migrateToEventLog, smartMerge } from './tracker.js';
+import { generateId, createTimestamp, sumForType, migrateToEventLog, smartMerge, updateEntry } from './tracker.js';
 import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries, getToken, setToken, clearToken, hasToken } from './storage.js';
 import { apiGenerateCode, apiGenerateToken, apiFetchCode, apiUploadEvents, apiDownloadEvents, apiUploadRitalinEvents, apiDownloadRitalinEvents } from './api.js';
 import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, updateSyncStatus as renderSyncStatus } from './ui.js';
@@ -14,11 +14,10 @@ const resetBtn = document.getElementById('reset-day');
 const exportBtn = document.getElementById('export');
 const syncFromCloudBtn = document.getElementById('sync-from-cloud');
 const syncToCloudBtn = document.getElementById('sync-to-cloud');
-const medicineTypeButtons = document.querySelectorAll('.medicine-type');
+const medicineTypeButtons = document.querySelectorAll('.medicine-type:not(.edit-asthma-type)');
 const preventiveBtn = document.getElementById('preventive-toggle');
 
-const today = new Date();
-usageDate.valueAsDate = today;
+usageDate.value = Temporal.Now.plainDateISO().toString();
 
 let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
 let preventive = false;
@@ -30,12 +29,12 @@ function renderAll(events) {
     saveEntries(entries);
     renderAll(entries);
     toast('Entry removed');
-  });
+  }, openAsthmaEditDialog);
   renderAsthmaChart(events);
 }
 
 function formatDate(value) {
-  return new Date(value).toISOString().slice(0, 10);
+  return Temporal.PlainDate.from(value).toString();
 }
 
 function updateCount(value) {
@@ -397,7 +396,7 @@ function renderRitalinAll(events) {
     saveRitalinEntries(ritalinEntries);
     renderRitalinAll(ritalinEntries);
     toast('Entry removed');
-  });
+  }, openRitalinEditDialog);
   renderRitalinChart(events);
 }
 
@@ -410,7 +409,7 @@ const ritalinSaveBtn = document.getElementById('ritalin-save');
 const ritalinResetBtn = document.getElementById('ritalin-reset-day');
 const ritalinExportBtn = document.getElementById('ritalin-export');
 
-ritalinDateEl.valueAsDate = new Date();
+ritalinDateEl.value = Temporal.Now.plainDateISO().toString();
 
 let ritalinEntries = loadRitalinEntries();
 
@@ -530,6 +529,96 @@ ritalinSyncFromCloudBtn.addEventListener('click', syncRitalinFromCloud);
 
 updateRitalinCountForDate();
 renderRitalinAll(ritalinEntries);
+
+// --- Asthma edit dialog ---
+const asthmaEditDialog = document.getElementById('asthma-edit-dialog');
+const editAsthmaDateEl = document.getElementById('edit-asthma-date');
+const editAsthmaTimeEl = document.getElementById('edit-asthma-time');
+const editAsthmaCountEl = document.getElementById('edit-asthma-count');
+const editAsthmaPreventiveBtn = document.getElementById('edit-asthma-preventive');
+const editAsthmaTypeButtons = document.querySelectorAll('.edit-asthma-type');
+const editAsthmaSaveBtn = document.getElementById('edit-asthma-save');
+const editAsthmaCancelBtn = document.getElementById('edit-asthma-cancel');
+
+let editingAsthmaEntry = null;
+let editingAsthmaPreventive = false;
+let editingAsthmaType = 'ventoline';
+
+function openAsthmaEditDialog(entry) {
+  editingAsthmaEntry = entry;
+  editingAsthmaPreventive = entry.preventive;
+  editingAsthmaType = entry.type;
+  const localTime = Temporal.Instant.from(entry.timestamp)
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toPlainTime();
+  editAsthmaDateEl.value = entry.date;
+  editAsthmaTimeEl.value = localTime.toString().slice(0, 5);
+  editAsthmaCountEl.value = entry.count;
+  editAsthmaTypeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.type === editingAsthmaType));
+  editAsthmaPreventiveBtn.classList.toggle('active', editingAsthmaPreventive);
+  asthmaEditDialog.showModal();
+}
+
+editAsthmaTypeButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    editingAsthmaType = btn.dataset.type;
+    editAsthmaTypeButtons.forEach((b) => b.classList.toggle('active', b === btn));
+  });
+});
+
+editAsthmaPreventiveBtn.addEventListener('click', () => {
+  editingAsthmaPreventive = !editingAsthmaPreventive;
+  editAsthmaPreventiveBtn.classList.toggle('active', editingAsthmaPreventive);
+});
+
+editAsthmaSaveBtn.addEventListener('click', () => {
+  const newDate = editAsthmaDateEl.value;
+  const newTime = editAsthmaTimeEl.value || '12:00';
+  const newCount = Number(editAsthmaCountEl.value) || 1;
+  const updated = { ...editingAsthmaEntry, date: newDate, timestamp: Temporal.PlainDateTime.from(`${newDate}T${newTime}:00`).toZonedDateTime(Temporal.Now.timeZoneId()).toInstant().toString(), type: editingAsthmaType, count: newCount, preventive: editingAsthmaPreventive };
+  entries = updateEntry(entries, updated);
+  saveEntries(entries);
+  renderAll(entries);
+  asthmaEditDialog.close();
+  toast('Entry updated');
+});
+
+editAsthmaCancelBtn.addEventListener('click', () => asthmaEditDialog.close());
+
+// --- Ritalin edit dialog ---
+const ritalinEditDialog = document.getElementById('ritalin-edit-dialog');
+const editRitalinDateEl = document.getElementById('edit-ritalin-date');
+const editRitalinTimeEl = document.getElementById('edit-ritalin-time');
+const editRitalinCountEl = document.getElementById('edit-ritalin-count');
+const editRitalinSaveBtn = document.getElementById('edit-ritalin-save');
+const editRitalinCancelBtn = document.getElementById('edit-ritalin-cancel');
+
+let editingRitalinEntry = null;
+
+function openRitalinEditDialog(entry) {
+  editingRitalinEntry = entry;
+  const localTime = Temporal.Instant.from(entry.timestamp)
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toPlainTime();
+  editRitalinDateEl.value = entry.date;
+  editRitalinTimeEl.value = localTime.toString().slice(0, 5);
+  editRitalinCountEl.value = entry.count;
+  ritalinEditDialog.showModal();
+}
+
+editRitalinSaveBtn.addEventListener('click', () => {
+  const newDate = editRitalinDateEl.value;
+  const newTime = editRitalinTimeEl.value || '12:00';
+  const newCount = Number(editRitalinCountEl.value) || 1;
+  const updated = { ...editingRitalinEntry, date: newDate, timestamp: Temporal.PlainDateTime.from(`${newDate}T${newTime}:00`).toZonedDateTime(Temporal.Now.timeZoneId()).toInstant().toString(), count: newCount };
+  ritalinEntries = updateEntry(ritalinEntries, updated);
+  saveRitalinEntries(ritalinEntries);
+  renderRitalinAll(ritalinEntries);
+  ritalinEditDialog.close();
+  toast('Entry updated');
+});
+
+editRitalinCancelBtn.addEventListener('click', () => ritalinEditDialog.close());
 
 const BASE_PATH = '/codex/';
 

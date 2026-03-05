@@ -163,9 +163,11 @@ def test_medicine_type_selector(page: Page, frontend_url: str):
     """Test that medicine type buttons work."""
     page.goto(frontend_url)
 
+    asthma_panel = page.locator('div[data-panel="asthma"]')
+
     # Initially, Ventoline should be active (default)
-    ventoline_btn = page.locator('button[data-type="ventoline"]')
-    spray_btn = page.locator('button[data-type="spray"]')
+    ventoline_btn = asthma_panel.locator('button[data-type="ventoline"]')
+    spray_btn = asthma_panel.locator('button[data-type="spray"]')
 
     expect(ventoline_btn).to_have_class("medicine-type active")
 
@@ -246,11 +248,12 @@ def test_switching_medicine_type_changes_counter(page: Page, frontend_url: str):
     """Test that switching medicine type shows the correct count for each type."""
     page.goto(frontend_url)
 
+    asthma_panel = page.locator('div[data-panel="asthma"]')
     counter = page.locator("#count")
     increment_btn = page.locator("#increment")
     save_btn = page.locator("#save")
-    spray_btn = page.locator('button[data-type="spray"]')
-    ventoline_btn = page.locator('button[data-type="ventoline"]')
+    spray_btn = asthma_panel.locator('button[data-type="spray"]')
+    ventoline_btn = asthma_panel.locator('button[data-type="ventoline"]')
 
     # Ventoline is selected by default
     # Increment to 2
@@ -351,9 +354,11 @@ def test_ui_elements_present(page: Page, frontend_url: str):
     # Date picker
     expect(page.locator("#usage-date")).to_be_visible()
 
+    asthma_panel = page.locator('div[data-panel="asthma"]')
+
     # Medicine type buttons
-    expect(page.locator('button[data-type="spray"]')).to_be_visible()
-    expect(page.locator('button[data-type="ventoline"]')).to_be_visible()
+    expect(asthma_panel.locator('button[data-type="spray"]')).to_be_visible()
+    expect(asthma_panel.locator('button[data-type="ventoline"]')).to_be_visible()
 
     # Counter controls
     expect(page.locator("#decrement")).to_be_visible()

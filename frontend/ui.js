@@ -8,10 +8,10 @@ export function toast(message) {
   setTimeout(() => toastEl.classList.remove('show'), 1800);
 }
 
-export function renderAsthmaHistory(events, onDeleteDate) {
+export function renderAsthmaHistory(events, onDeleteDate, onEditEntry) {
   const entriesEl = document.getElementById('entries');
   entriesEl.innerHTML = '';
-  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => new Date(b) - new Date(a));
+  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => Temporal.PlainDate.compare(b, a));
   if (!dates.length) {
     entriesEl.innerHTML = '<div class="hint">No history yet. Save your first day.</div>';
     return;
@@ -35,6 +35,24 @@ export function renderAsthmaHistory(events, onDeleteDate) {
     del.addEventListener('click', () => onDeleteDate(date));
     item.appendChild(del);
     entriesEl.appendChild(item);
+
+    if (onEditEntry) {
+      const dayEvents = events.filter((e) => e.date === date);
+      for (const event of dayEvents) {
+        const subRow = document.createElement('div');
+        subRow.className = 'entry-subrow';
+        const time = Temporal.Instant.from(event.timestamp).toZonedDateTimeISO(Temporal.Now.timeZoneId()).toPlainTime().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const typeLabel = event.type === 'spray' ? 'Spray' : 'Ventoline';
+        const preventiveLabel = event.preventive ? ' · preventive' : '';
+        subRow.innerHTML = `<span class="subrow-detail">${typeLabel} × ${event.count}${preventiveLabel} <span class="breakdown">(${time})</span></span>`;
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.className = 'ghost';
+        editBtn.addEventListener('click', () => onEditEntry(event));
+        subRow.appendChild(editBtn);
+        entriesEl.appendChild(subRow);
+      }
+    }
   }
 }
 
@@ -44,10 +62,10 @@ export function renderAsthmaChart(events) {
   chartEl.innerHTML = svg ?? '<div class="hint">No data yet.</div>';
 }
 
-export function renderRitalinHistory(events, onDeleteDate) {
+export function renderRitalinHistory(events, onDeleteDate, onEditEntry) {
   const entriesEl = document.getElementById('ritalin-entries');
   entriesEl.innerHTML = '';
-  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => new Date(b) - new Date(a));
+  const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => Temporal.PlainDate.compare(b, a));
   if (!dates.length) {
     entriesEl.innerHTML = '<div class="hint">No history yet. Log your first dose.</div>';
     return;
@@ -57,7 +75,7 @@ export function renderRitalinHistory(events, onDeleteDate) {
     const total = dayEvents.reduce((sum, e) => sum + e.count, 0);
     const times = dayEvents
       .filter((e) => e.timestamp)
-      .map((e) => new Date(e.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))
+      .map((e) => Temporal.Instant.from(e.timestamp).toZonedDateTimeISO(Temporal.Now.timeZoneId()).toPlainTime().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }))
       .join(', ');
     const item = document.createElement('div');
     item.className = 'entry';
@@ -68,6 +86,23 @@ export function renderRitalinHistory(events, onDeleteDate) {
     del.addEventListener('click', () => onDeleteDate(date));
     item.appendChild(del);
     entriesEl.appendChild(item);
+
+    if (onEditEntry) {
+      for (const event of dayEvents) {
+        const subRow = document.createElement('div');
+        subRow.className = 'entry-subrow';
+        const time = event.timestamp
+          ? Temporal.Instant.from(event.timestamp).toZonedDateTimeISO(Temporal.Now.timeZoneId()).toPlainTime().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' })
+          : '';
+        subRow.innerHTML = `<span class="subrow-detail">${event.count} ${event.count === 1 ? 'dose' : 'doses'}${time ? ` <span class="breakdown">(${time})</span>` : ''}</span>`;
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.className = 'ghost';
+        editBtn.addEventListener('click', () => onEditEntry(event));
+        subRow.appendChild(editBtn);
+        entriesEl.appendChild(subRow);
+      }
+    }
   }
 }
 

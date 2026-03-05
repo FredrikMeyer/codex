@@ -385,3 +385,46 @@ button.ritalin-primary {
   .counter { grid-template-columns: repeat(3, 1fr); }
   .code-input-group { flex-direction: column; }
 }
+
+.entry-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 6px 24px;
+  border-left: 2px solid var(--border);
+  margin: 2px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.entry-subrow .ghost {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  min-width: auto;
+}
+
+.subrow-detail {
+  flex: 1;
+}
+
+dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  color: var(--text);
+  max-width: 400px;
+  width: 90%;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+dialog h2 {
+  margin: 0 0 20px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}

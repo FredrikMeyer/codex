@@ -350,6 +350,7 @@ When refactoring low-cohesion logic (scattered, duplicated), consider two approa
 
 ## Frontend Changes
 - **Always update the cache key** when making frontend changes to ensure users receive the latest assets
+- **JS unit tests run with Deno**: `deno test --allow-read frontend/test/*.test.js` — Deno is used because it ships the Temporal API natively. The test files use `node:test` and `node:assert` which Deno supports via its Node.js compatibility layer.
 
 ## Code Exploration with ast-grep
 Use `sg` (ast-grep) for structural code search. Unlike text-based grep, it understands syntax and can match code patterns across a codebase.

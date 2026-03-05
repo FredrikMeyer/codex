@@ -47,7 +47,7 @@ echo ""
 
 echo -e "${YELLOW}🧪 Running JS unit tests${NC}"
 echo ""
-node --test frontend/test/*.test.js
+deno test --allow-read frontend/test/*.test.js
 JS_EXIT_CODE=$?
 if [ $JS_EXIT_CODE -eq 0 ]; then
     echo ""

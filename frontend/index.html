@@ -170,6 +170,62 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <dialog id="asthma-edit-dialog" aria-labelledby="asthma-edit-title">
+    <h2 id="asthma-edit-title">Edit entry</h2>
+    <form method="dialog">
+      <div class="field-row">
+        <div class="field">
+          <label for="edit-asthma-date">Date</label>
+          <input type="date" id="edit-asthma-date" required>
+        </div>
+        <div class="field">
+          <label for="edit-asthma-time">Time</label>
+          <input type="time" id="edit-asthma-time">
+        </div>
+      </div>
+      <div class="field">
+        <label>Medicine Type</label>
+        <div class="medicine-type-selector">
+          <button type="button" class="medicine-type edit-asthma-type" data-type="spray">Spray</button>
+          <button type="button" class="medicine-type edit-asthma-type" data-type="ventoline">Ventoline</button>
+        </div>
+        <button type="button" id="edit-asthma-preventive" class="preventive-toggle">Preventivt</button>
+      </div>
+      <div class="field">
+        <label for="edit-asthma-count">Count</label>
+        <input type="number" id="edit-asthma-count" min="1" required>
+      </div>
+      <div class="actions">
+        <button type="button" id="edit-asthma-save" class="primary">Save</button>
+        <button type="button" id="edit-asthma-cancel" class="ghost">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="ritalin-edit-dialog" aria-labelledby="ritalin-edit-title">
+    <h2 id="ritalin-edit-title">Edit entry</h2>
+    <form method="dialog">
+      <div class="field-row">
+        <div class="field">
+          <label for="edit-ritalin-date">Date</label>
+          <input type="date" id="edit-ritalin-date" required>
+        </div>
+        <div class="field">
+          <label for="edit-ritalin-time">Time</label>
+          <input type="time" id="edit-ritalin-time">
+        </div>
+      </div>
+      <div class="field">
+        <label for="edit-ritalin-count">Count</label>
+        <input type="number" id="edit-ritalin-count" min="1" required>
+      </div>
+      <div class="actions">
+        <button type="button" id="edit-ritalin-save" class="primary ritalin-primary">Save</button>
+        <button type="button" id="edit-ritalin-cancel" class="ghost">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>

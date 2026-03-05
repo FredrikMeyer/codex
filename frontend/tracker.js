@@ -6,8 +6,8 @@ export function generateId() {
 }
 
 export function createTimestamp(dateValue) {
-  const today = new Date().toISOString().slice(0, 10);
-  return dateValue === today ? new Date().toISOString() : dateValue + 'T12:00:00.000Z';
+  const today = Temporal.Now.plainDateISO().toString();
+  return dateValue === today ? Temporal.Now.instant().toString() : dateValue + 'T12:00:00.000Z';
 }
 
 export function getEventsForDate(events, date) {
@@ -20,13 +20,14 @@ export function sumForType(events, date, type) {
     .reduce((sum, e) => sum + e.count, 0);
 }
 
+function daysAgoISO(daysAgo) {
+  return Temporal.Now.plainDateISO().subtract({ days: daysAgo }).toString();
+}
+
 export function aggregateByDate(events, days = 30) {
-  const now = new Date();
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const date = d.toISOString().slice(0, 10);
+    const date = daysAgoISO(i);
     const spray = sumForType(events, date, 'spray');
     const ventoline = sumForType(events, date, 'ventoline');
     if (spray > 0 || ventoline > 0) {
@@ -37,12 +38,9 @@ export function aggregateByDate(events, days = 30) {
 }
 
 export function aggregateRitalinByDate(events, days = 30) {
-  const now = new Date();
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const date = d.toISOString().slice(0, 10);
+    const date = daysAgoISO(i);
     const count = events
       .filter((e) => e.date === date)
       .reduce((sum, e) => sum + e.count, 0);
@@ -75,6 +73,10 @@ export function migrateToEventLog(data, generateIdFn = generateId) {
   }
 
   return events;
+}
+
+export function updateEntry(entries, updatedEntry) {
+  return entries.map((e) => (e.id === updatedEntry.id ? { ...updatedEntry } : e));
 }
 
 export function smartMerge(localEntries, cloudEntries) {
