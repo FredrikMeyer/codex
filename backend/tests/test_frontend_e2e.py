@@ -869,6 +869,44 @@ def test_v2_migration_stores_data_as_array(page: Page, frontend_url: str):
     assert "timestamp" in event
 
 
+def test_ritalin_counter_resets_to_zero_after_save(page: Page, frontend_url: str):
+    """Saving a Ritalin dose resets the counter to 0, not to the running daily total.
+
+    Regression test: the counter previously showed the daily total on init/date-change,
+    so a second save would record the wrong count and inflate the total.
+    """
+    page.goto(frontend_url)
+    page.evaluate("localStorage.clear()")
+    page.reload()
+
+    # Navigate to Ritalin tab
+    page.locator(".tab[data-tab='ritalin']").click()
+
+    counter = page.locator("#ritalin-count")
+    inc_btn = page.locator("#ritalin-increment")
+    save_btn = page.locator("#ritalin-save")
+
+    # First save: log 2 doses
+    inc_btn.click()
+    inc_btn.click()
+    expect(counter).to_have_text("2")
+    save_btn.click()
+    page.wait_for_timeout(300)
+
+    # Counter must reset to 0, not remain at 2
+    expect(counter).to_have_text("0")
+
+    # Second save: log 1 more dose
+    inc_btn.click()
+    expect(counter).to_have_text("1")
+    save_btn.click()
+    page.wait_for_timeout(300)
+
+    # Total in history should be 3 (2 + 1), not inflated
+    entry = page.locator("#ritalin-entries .entry").first
+    expect(entry).to_contain_text("3 doses")
+
+
 def test_existing_event_array_is_not_modified_by_migration(page: Page, frontend_url: str):
     """Data already in event-array format passes through migration unchanged."""
     page.goto(frontend_url)
