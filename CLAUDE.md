@@ -364,6 +364,16 @@ sg -p 'new $TYPE($$$)' --lang java
 
 Prefer `sg` over `grep` when searching for code patterns where structure matters (method calls, class usages, expression shapes).
 
+## Fetching Production Logs
+Use `./fetch-app-logs.sh` to retrieve logs from the production server.
+
+```bash
+./fetch-app-logs.sh              # last 100 lines (default)
+./fetch-app-logs.sh --lines 500  # last N lines
+```
+
+Useful for diagnosing sync errors, rejected events, and other production issues.
+
 ## General Preferences
 - British English with Oxford spelling preferred
 
