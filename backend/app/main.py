@@ -1,4 +1,5 @@
 
+import logging
 import os
 import random
 import secrets
@@ -8,6 +9,8 @@ from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -361,6 +364,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
             first_error = e.errors()[0]
             field = first_error["loc"][0] if first_error["loc"] else "event"
             message = first_error["msg"]
+            logger.warning("Invalid asthma event rejected: %s (field=%s, payload=%r)", message, field, event)
             return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
 
         auth_header = request.headers.get("Authorization", "")
@@ -429,6 +433,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
             first_error = e.errors()[0]
             field = first_error["loc"][0] if first_error["loc"] else "event"
             message = first_error["msg"]
+            logger.warning("Invalid ritalin event rejected: %s (field=%s, payload=%r)", message, field, event)
             return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
 
         auth_header = request.headers.get("Authorization", "")
