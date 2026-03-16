@@ -58,11 +58,11 @@ def test_cors_headers_present_on_generate_token(client):
     assert "Access-Control-Allow-Origin" in response.headers
 
 
-def test_cors_headers_present_on_logs(client):
-    """CORS headers are present on /logs endpoint."""
+def test_cors_headers_present_on_events(client):
+    """CORS headers are present on /events endpoint."""
     response = client.post(
-        "/logs",
-        json={"log": {"date": "2026-02-09", "spray": 1}},
+        "/events",
+        json={"event": {"id": "x", "date": "2026-02-09", "timestamp": "2026-02-09T12:00:00Z", "type": "spray", "count": 1}},
         headers={"Origin": "https://example.github.io"}
     )
 
@@ -84,7 +84,7 @@ def test_cors_allows_credentials(client):
 def test_cors_preflight_request(client):
     """CORS preflight (OPTIONS) requests are handled correctly."""
     response = client.options(
-        "/logs",
+        "/events",
         headers={
             "Origin": "https://example.github.io",
             "Access-Control-Request-Method": "POST",
@@ -104,7 +104,7 @@ def test_cors_preflight_request(client):
 def test_cors_allows_authorization_header(client):
     """CORS configuration allows Authorization header."""
     response = client.options(
-        "/logs",
+        "/events",
         headers={
             "Origin": "https://example.github.io",
             "Access-Control-Request-Method": "POST",
@@ -120,7 +120,7 @@ def test_cors_allows_authorization_header(client):
 def test_cors_allows_content_type_header(client):
     """CORS configuration allows Content-Type header."""
     response = client.options(
-        "/logs",
+        "/events",
         headers={
             "Origin": "https://example.github.io",
             "Access-Control-Request-Method": "POST",
@@ -136,7 +136,7 @@ def test_cors_allows_content_type_header(client):
 def test_cors_allows_post_method(client):
     """CORS configuration allows POST method."""
     response = client.options(
-        "/logs",
+        "/events",
         headers={
             "Origin": "https://example.github.io",
             "Access-Control-Request-Method": "POST"
