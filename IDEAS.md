@@ -76,9 +76,6 @@ Handles event listeners, UI orchestration, sync logic, and state management. Mor
 **`localStorage` → `IndexedDB`**
 localStorage is synchronous, size-limited (~5MB), and blocked in some private browsing modes. For a health app, IndexedDB is more reliable. The abstraction in `storage.js` makes this migration feasible without touching `app.js`.
 
-**Remove the deprecated `/logs` endpoint**
-Deferred since `EVENT_LOG_PLAN.md` was written. Dead code in production is a maintenance risk.
-
 **Backend: JSON file → SQLite**
 The JSON file storage works but is fragile — a crash mid-write corrupts the file. SQLite is just as zero-dependency, but transactional.
 
