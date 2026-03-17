@@ -15,6 +15,9 @@ After making any code changes, ALWAYS run `./test.sh` before considering the wor
 - Never skip this step, even for "simple" changes
 - ALWAYS run the full test suite before finishing a task or making the final commit
 
+## Committing Tests With Code
+Always commit tests in the same commit as the code they test. Never commit a new function and its unit tests as separate commits.
+
 ## Single Responsibility
 You strive to make classes do one thing and do it well. We clearly state the responsibility of the class in the 
 class level JavaDoc comment.
