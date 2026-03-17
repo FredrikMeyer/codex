@@ -434,3 +434,19 @@ dialog h2 {
   font-size: 1.1rem;
   font-weight: 700;
 }
+
+.weekly-summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  min-height: 1.2em;
+}
+.weekly-summary .weekly-count { font-weight: 600; }
+.weekly-summary .weekly-delta { font-size: 0.85rem; }
+.weekly-summary .weekly-delta.better { color: #2d8a4e; }
+.weekly-summary .weekly-delta.worse  { color: #c0392b; }
+.weekly-summary .weekly-delta.same   { color: #888; }
+.weekly-summary .weekly-none         { color: #888; font-size: 0.85rem; }
