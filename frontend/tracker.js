@@ -75,6 +75,31 @@ export function migrateToEventLog(data, generateIdFn = generateId) {
   return events;
 }
 
+export function weeklyRescueSummary(events) {
+  const today = Temporal.Now.plainDateISO();
+  const thisWeekStart = today.subtract({ days: 6 });
+  const lastWeekStart = today.subtract({ days: 13 });
+
+  const inThisWeek = (e) => {
+    const d = Temporal.PlainDate.from(e.date);
+    return !e.preventive &&
+      Temporal.PlainDate.compare(d, thisWeekStart) >= 0 &&
+      Temporal.PlainDate.compare(d, today) <= 0;
+  };
+
+  const inLastWeek = (e) => {
+    const d = Temporal.PlainDate.from(e.date);
+    return !e.preventive &&
+      Temporal.PlainDate.compare(d, lastWeekStart) >= 0 &&
+      Temporal.PlainDate.compare(d, thisWeekStart) < 0;
+  };
+
+  const thisWeek = events.filter(inThisWeek).reduce((sum, e) => sum + e.count, 0);
+  const lastWeek = events.filter(inLastWeek).reduce((sum, e) => sum + e.count, 0);
+
+  return { thisWeek, lastWeek, delta: thisWeek - lastWeek };
+}
+
 export function updateEntry(entries, updatedEntry) {
   return entries.map((e) => (e.id === updatedEntry.id ? { ...updatedEntry } : e));
 }

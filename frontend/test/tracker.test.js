@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary } from '../tracker.js';
 
 test('generateId returns a non-empty string', () => {
   const id = generateId();
@@ -177,6 +177,64 @@ test('migrateToEventLog skips zero counts', () => {
   const result = migrateToEventLog(input, () => 'test-id');
   assert.equal(result.length, 1);
   assert.equal(result[0].type, 'ventoline');
+});
+
+test('weeklyRescueSummary returns zeros for empty events', () => {
+  const result = weeklyRescueSummary([]);
+  assert.deepEqual(result, { thisWeek: 0, lastWeek: 0, delta: 0 });
+});
+
+test('weeklyRescueSummary ignores preventive events', () => {
+  const today = Temporal.Now.plainDateISO().toString();
+  const events = [{ date: today, count: 3, preventive: true }];
+  const result = weeklyRescueSummary(events);
+  assert.deepEqual(result, { thisWeek: 0, lastWeek: 0, delta: 0 });
+});
+
+test('weeklyRescueSummary counts rescue event today in thisWeek', () => {
+  const today = Temporal.Now.plainDateISO().toString();
+  const events = [{ date: today, count: 2, preventive: false }];
+  const result = weeklyRescueSummary(events);
+  assert.equal(result.thisWeek, 2);
+  assert.equal(result.lastWeek, 0);
+  assert.equal(result.delta, 2);
+});
+
+test('weeklyRescueSummary counts rescue event 8 days ago in lastWeek', () => {
+  const date = Temporal.Now.plainDateISO().subtract({ days: 8 }).toString();
+  const events = [{ date, count: 1, preventive: false }];
+  const result = weeklyRescueSummary(events);
+  assert.equal(result.thisWeek, 0);
+  assert.equal(result.lastWeek, 1);
+  assert.equal(result.delta, -1);
+});
+
+test('weeklyRescueSummary counts rescue event 13 days ago in lastWeek', () => {
+  const date = Temporal.Now.plainDateISO().subtract({ days: 13 }).toString();
+  const events = [{ date, count: 1, preventive: false }];
+  const result = weeklyRescueSummary(events);
+  assert.equal(result.thisWeek, 0);
+  assert.equal(result.lastWeek, 1);
+});
+
+test('weeklyRescueSummary ignores rescue event 15 days ago', () => {
+  const date = Temporal.Now.plainDateISO().subtract({ days: 15 }).toString();
+  const events = [{ date, count: 5, preventive: false }];
+  const result = weeklyRescueSummary(events);
+  assert.deepEqual(result, { thisWeek: 0, lastWeek: 0, delta: 0 });
+});
+
+test('weeklyRescueSummary delta is thisWeek minus lastWeek', () => {
+  const thisWeekDate = Temporal.Now.plainDateISO().subtract({ days: 1 }).toString();
+  const lastWeekDate = Temporal.Now.plainDateISO().subtract({ days: 8 }).toString();
+  const events = [
+    { date: thisWeekDate, count: 3, preventive: false },
+    { date: lastWeekDate, count: 5, preventive: false }
+  ];
+  const result = weeklyRescueSummary(events);
+  assert.equal(result.thisWeek, 3);
+  assert.equal(result.lastWeek, 5);
+  assert.equal(result.delta, -2);
 });
 
 test('updateEntry replaces the entry with the matching id', () => {
