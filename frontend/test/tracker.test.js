@@ -48,7 +48,7 @@ test('sumForType sums counts for a given date and type', () => {
 });
 
 test('aggregateByDate returns only days with data', () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = Temporal.Now.plainDateISO().toString();
   const events = [
     { date: today, type: 'ventoline', count: 2 },
     { date: today, type: 'spray', count: 1 }
@@ -73,7 +73,7 @@ test('aggregateByDate ignores events older than the window', () => {
 });
 
 test('aggregateRitalinByDate returns count per day', () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = Temporal.Now.plainDateISO().toString();
   const events = [
     { date: today, count: 3 },
     { date: today, count: 2 }
