@@ -1,7 +1,7 @@
 import { lastTypeKey } from './config.js';
-import { generateId, createTimestamp, sumForType, migrateToEventLog } from './tracker.js';
+import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescueSummary } from './tracker.js';
 import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries } from './storage.js';
-import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart } from './ui.js';
+import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, renderWeeklySummary } from './ui.js';
 import { initAsthmaEditDialog, openAsthmaEditDialog, initRitalinEditDialog, openRitalinEditDialog } from './editDialog.js';
 import { initSyncService } from './syncService.js';
 
@@ -23,6 +23,7 @@ let preventive = false;
 
 
 function renderAll(events) {
+  renderWeeklySummary(weeklyRescueSummary(events));
   renderAsthmaHistory(events, (date) => {
     entries = entries.filter((e) => e.date !== date);
     saveEntries(entries);

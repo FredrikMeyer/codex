@@ -135,3 +135,24 @@ export function updateSyncStatus(isConfigured, elements) {
     ritalinSyncToCloudBtn.style.display = 'none';
   }
 }
+
+export function buildWeeklySummaryHtml(stats) {
+  const { thisWeek, lastWeek, delta } = stats;
+  if (thisWeek === 0 && lastWeek === 0) {
+    return '<span class="weekly-none">No rescue uses in the last 2 weeks</span>';
+  }
+  const arrow = delta < 0 ? '↓' : delta > 0 ? '↑' : '→';
+  const cls = delta < 0 ? 'better' : delta > 0 ? 'worse' : 'same';
+  const absDelta = Math.abs(delta);
+  const changeText = delta === 0 ? 'same as last week' : `${arrow}${absDelta} from last week`;
+  return `
+    <span class="weekly-count">${thisWeek} rescue ${thisWeek === 1 ? 'use' : 'uses'} this week</span>
+    <span class="weekly-delta ${cls}">${changeText}</span>
+  `;
+}
+
+export function renderWeeklySummary(stats) {
+  const el = document.getElementById('weekly-summary');
+  if (!el) return;
+  el.innerHTML = buildWeeklySummaryHtml(stats);
+}
