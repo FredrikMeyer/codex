@@ -184,6 +184,12 @@ button.ghost.danger {
   color: #ef4444;
 }
 
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .section-heading {
   display: flex;
   justify-content: space-between;
