@@ -16,9 +16,6 @@ A formatted PDF or printable HTML summary for GP appointments: total doses by mo
 **Symptom severity on rescue doses**
 A 1–3 scale (mild / moderate / severe) on rescue logs. Cheap to add, rich to analyse.
 
-**Weekly trend summary**
-A "this week vs last week" card at the top: `Rescue uses: 2 (↓1 from last week)`. Gives instant context without needing to read the chart.
-
 ---
 
 ### Ritalin-specific
@@ -82,18 +79,13 @@ The JSON file storage works but is fragile — a crash mid-write corrupts the fi
 **Error handling in async ops**
 Several sync functions have minimal error reporting. A failed individual event upload silently continues. Errors should surface with enough detail to diagnose (which event? what HTTP status?).
 
-**No loading states during sync**
-Sync buttons give no visual feedback while in progress. A simple "syncing…" state prevents double-clicks and reassures the user.
-
 ---
 
 ### Architecture
-
-**Backend URL hardcoded in `config.js`**
-Makes it hard to run against a local backend without editing a file. Even a simple `?backend=http://localhost:5000` query param override would help development.
 
 **No app version shown in UI**
 A small version string in the settings/sync area (matching the service worker cache key) helps diagnose issues with users.
 
 **JSDoc type annotations + `tsc --checkJs`**
 The codebase has good module separation but no type safety. Adding JSDoc types and running `tsc --checkJs --noEmit` (zero build step) would catch bugs like passing the wrong event shape to `smartMerge`.
+    
