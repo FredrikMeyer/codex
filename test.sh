@@ -127,7 +127,7 @@ case "$1" in
     --unit)
         echo -e "${YELLOW}🔬 Running unit tests only${NC}"
         echo ""
-        uv run pytest tests/test_app.py tests/test_login_flow.py -v
+        uv run pytest --ignore=tests/test_e2e.py --ignore=tests/test_playwright_example.py --ignore=tests/test_frontend_e2e.py -v
         ;;
     --watch)
         echo -e "${YELLOW}👀 Watch mode: tests will re-run on file changes${NC}"
