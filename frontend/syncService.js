@@ -1,6 +1,6 @@
 import { smartMerge } from './tracker.js';
 import { saveEntries, saveRitalinEntries, getToken, setToken, clearToken, hasToken } from './storage.js';
-import { apiGenerateCode, apiGenerateToken, apiFetchCode, apiUploadEvents, apiDownloadEvents, apiUploadRitalinEvents, apiDownloadRitalinEvents } from './api.js';
+import { apiGenerateCode, apiGenerateToken, apiFetchCode, apiUploadEvents, apiDownloadEvents, apiUploadRitalinEvents, apiDownloadRitalinEvents, apiDeleteEvents, apiDeleteRitalinEvents } from './api.js';
 import { toast, updateSyncStatus as renderSyncStatus } from './ui.js';
 
 // DOM elements
@@ -270,6 +270,26 @@ async function syncRitalinFromCloud() {
   } finally {
     ritalinSyncFromCloudBtn.disabled = false;
     ritalinSyncFromCloudBtn.textContent = 'Sync from Cloud';
+  }
+}
+
+export async function deleteEventsFromCloud(ids) {
+  const token = getToken();
+  if (!token || ids.length === 0) return;
+  try {
+    await apiDeleteEvents(token, ids);
+  } catch (error) {
+    console.error('Failed to delete events from cloud:', error);
+  }
+}
+
+export async function deleteRitalinEventsFromCloud(ids) {
+  const token = getToken();
+  if (!token || ids.length === 0) return;
+  try {
+    await apiDeleteRitalinEvents(token, ids);
+  } catch (error) {
+    console.error('Failed to delete ritalin events from cloud:', error);
   }
 }
 

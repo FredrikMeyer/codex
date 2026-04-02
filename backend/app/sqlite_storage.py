@@ -206,6 +206,22 @@ class SqliteStorage:
             )
             self._conn.commit()
 
+    def delete_event(self, code: str, event_id: str) -> None:
+        """Delete an asthma event by ID for a user. No-op if not found."""
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM asthma_events WHERE id = ? AND code = ?", (event_id, code)
+            )
+            self._conn.commit()
+
+    def delete_ritalin_event(self, code: str, event_id: str) -> None:
+        """Delete a ritalin event by ID for a user. No-op if not found."""
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM ritalin_events WHERE id = ? AND code = ?", (event_id, code)
+            )
+            self._conn.commit()
+
     def validate_token(self, token: str) -> bool:
         """Return True if the token matches any stored code entry."""
         with self._lock:

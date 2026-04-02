@@ -80,6 +80,28 @@ export async function apiUploadRitalinEvents(token, events) {
   return { successCount: saved, errorCount: 0 };
 }
 
+export async function apiDeleteEvents(token, ids) {
+  const response = await fetch(`${backendUrl}/events`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ ids })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete events: ${response.status}`);
+  }
+}
+
+export async function apiDeleteRitalinEvents(token, ids) {
+  const response = await fetch(`${backendUrl}/ritalin-events`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ ids })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete ritalin events: ${response.status}`);
+  }
+}
+
 export async function apiDownloadRitalinEvents(token) {
   const response = await fetch(`${backendUrl}/ritalin-events`, {
     method: 'GET',

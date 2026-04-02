@@ -3,7 +3,7 @@ import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescu
 import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries } from './storage.js';
 import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, renderWeeklySummary } from './ui.js';
 import { initAsthmaEditDialog, openAsthmaEditDialog, initRitalinEditDialog, openRitalinEditDialog } from './editDialog.js';
-import { initSyncService } from './syncService.js';
+import { initSyncService, deleteEventsFromCloud, deleteRitalinEventsFromCloud } from './syncService.js';
 
 // DOM elements
 const usageDate = document.getElementById('usage-date');
@@ -25,8 +25,10 @@ let preventive = false;
 function renderAll(events) {
   renderWeeklySummary(weeklyRescueSummary(events));
   renderAsthmaHistory(events, (date) => {
+    const removedIds = entries.filter((e) => e.date === date).map((e) => e.id);
     entries = entries.filter((e) => e.date !== date);
     saveEntries(entries);
+    deleteEventsFromCloud(removedIds);
     renderAll(entries);
     toast('Entry removed');
   }, openAsthmaEditDialog);
@@ -160,8 +162,10 @@ tabButtons.forEach((btn) => {
 
 function renderRitalinAll(events) {
   renderRitalinHistory(events, (date) => {
+    const removedIds = ritalinEntries.filter((e) => e.date === date).map((e) => e.id);
     ritalinEntries = ritalinEntries.filter((e) => e.date !== date);
     saveRitalinEntries(ritalinEntries);
+    deleteRitalinEventsFromCloud(removedIds);
     renderRitalinAll(ritalinEntries);
     toast('Entry removed');
   }, openRitalinEditDialog);

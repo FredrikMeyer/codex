@@ -1,5 +1,5 @@
 """
-Tests for POST /events, POST /events/batch, and GET /events endpoints.
+Tests for POST /events, POST /events/batch, DELETE /events, and GET /events endpoints.
 
 Each usage is stored as an event with timestamp, type, count,
 and attributes such as preventive. Events are identified by a client-generated
@@ -251,3 +251,61 @@ def test_batch_post_empty_list_returns_zero(auth_token):
     )
     assert response.status_code == 200
     assert response.get_json() == {"saved": 0, "duplicates": 0}
+
+
+# --- DELETE /events ---
+
+def test_delete_events_requires_token(client):
+    """DELETE /events returns 401 without a token."""
+    response = client.delete("/events", json={"ids": ["abc-123"]})
+    assert response.status_code == 401
+
+
+def test_delete_events_removes_specified_ids(auth_token):
+    """Deleted event IDs are no longer returned by GET /events."""
+    test_client, _, token = auth_token
+    headers = {"Authorization": f"Bearer {token}"}
+
+    test_client.post("/events/batch", json={"events": [_valid_event(id="e1"), _valid_event(id="e2")]}, headers=headers)
+
+    response = test_client.delete("/events", json={"ids": ["e1"]}, headers=headers)
+    assert response.status_code == 200
+
+    remaining = test_client.get("/events", headers=headers).get_json()["events"]
+    assert len(remaining) == 1
+    assert remaining[0]["id"] == "e2"
+
+
+def test_delete_events_with_unknown_id_is_a_noop(auth_token):
+    """Deleting a non-existent ID returns 200 and causes no error."""
+    test_client, _, token = auth_token
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = test_client.delete("/events", json={"ids": ["does-not-exist"]}, headers=headers)
+    assert response.status_code == 200
+
+
+def test_delete_events_only_affects_requesting_user(auth_token):
+    """A user cannot delete another user's events."""
+    test_client, _, token1 = auth_token
+    headers1 = {"Authorization": f"Bearer {token1}"}
+
+    code2 = test_client.post("/generate-code").get_json()["code"]
+    token2 = test_client.post("/generate-token", json={"code": code2}).get_json()["token"]
+    headers2 = {"Authorization": f"Bearer {token2}"}
+
+    test_client.post("/events", json={"event": _valid_event(id="shared-id")}, headers=headers2)
+
+    test_client.delete("/events", json={"ids": ["shared-id"]}, headers=headers1)
+
+    events = test_client.get("/events", headers=headers2).get_json()["events"]
+    assert len(events) == 1
+
+
+def test_delete_events_missing_ids_key_returns_400(auth_token):
+    """DELETE /events without 'ids' key returns 400."""
+    test_client, _, token = auth_token
+    response = test_client.delete(
+        "/events", json={"not_ids": []}, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 400

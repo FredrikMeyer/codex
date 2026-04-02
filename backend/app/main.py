@@ -8,8 +8,6 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
 
-logger = logging.getLogger(__name__)
-
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -20,6 +18,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .repository import CodeRepository, LogRepository
 from .sqlite_storage import SqliteStorage
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -111,7 +111,7 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
         origins=origins,
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
-        methods=["GET", "POST", "OPTIONS"]
+        methods=["GET", "POST", "DELETE", "OPTIONS"]
     )
 
     # Configure proxy support for production (behind nginx)
@@ -358,6 +358,33 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
 
         return jsonify({"events": log_repository.get_events(code)})
 
+    @app.delete("/events")
+    @require_auth()
+    @limiter.limit("100 per minute")
+    def delete_events() -> Any:
+        """
+        Delete asthma events by ID for the authenticated user.
+
+        Body:
+            JSON: {"ids": ["id1", "id2", ...]}
+
+        Returns:
+            JSON: {"deleted": N}
+        """
+        payload = request.get_json(silent=True) or {}
+        ids = payload.get("ids")
+        if not isinstance(ids, list):
+            return jsonify({"error": "'ids' (array) is required"}), 400
+
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]
+        code = code_repository.get_code_for_token(token)
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        log_repository.delete_events(code, ids)
+        return jsonify({"deleted": len(ids)})
+
     @app.post("/ritalin-events")
     @require_auth()
     @limiter.limit("100 per minute")
@@ -461,6 +488,33 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
             return jsonify({"error": "Invalid token"}), 401
 
         return jsonify({"events": log_repository.get_ritalin_events(code)})
+
+    @app.delete("/ritalin-events")
+    @require_auth()
+    @limiter.limit("100 per minute")
+    def delete_ritalin_events() -> Any:
+        """
+        Delete ritalin events by ID for the authenticated user.
+
+        Body:
+            JSON: {"ids": ["id1", "id2", ...]}
+
+        Returns:
+            JSON: {"deleted": N}
+        """
+        payload = request.get_json(silent=True) or {}
+        ids = payload.get("ids")
+        if not isinstance(ids, list):
+            return jsonify({"error": "'ids' (array) is required"}), 400
+
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]
+        code = code_repository.get_code_for_token(token)
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        log_repository.delete_ritalin_events(code, ids)
+        return jsonify({"deleted": len(ids)})
 
     @app.get("/health")
     def health() -> Any:

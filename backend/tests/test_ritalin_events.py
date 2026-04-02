@@ -1,5 +1,5 @@
 """
-Tests for POST /ritalin-events, POST /ritalin-events/batch, and GET /ritalin-events endpoints.
+Tests for POST /ritalin-events, POST /ritalin-events/batch, DELETE /ritalin-events, and GET /ritalin-events endpoints.
 
 Ritalin doses are stored as events identified by a client-generated
 UUID that makes saves idempotent.
@@ -168,4 +168,62 @@ def test_ritalin_batch_invalid_event_returns_400(auth_token):
 
     response = test_client.post("/ritalin-events/batch", json={"events": events}, headers=headers)
 
+    assert response.status_code == 400
+
+
+# --- DELETE /ritalin-events ---
+
+def test_delete_ritalin_events_requires_token(client):
+    """DELETE /ritalin-events returns 401 without a token."""
+    response = client.delete("/ritalin-events", json={"ids": ["ritalin-abc-123"]})
+    assert response.status_code == 401
+
+
+def test_delete_ritalin_events_removes_specified_ids(auth_token):
+    """Deleted ritalin event IDs are no longer returned by GET /ritalin-events."""
+    test_client, _, token = auth_token
+    headers = {"Authorization": f"Bearer {token}"}
+
+    test_client.post("/ritalin-events/batch", json={"events": [_valid_event(id="r1"), _valid_event(id="r2")]}, headers=headers)
+
+    response = test_client.delete("/ritalin-events", json={"ids": ["r1"]}, headers=headers)
+    assert response.status_code == 200
+
+    remaining = test_client.get("/ritalin-events", headers=headers).get_json()["events"]
+    assert len(remaining) == 1
+    assert remaining[0]["id"] == "r2"
+
+
+def test_delete_ritalin_events_with_unknown_id_is_a_noop(auth_token):
+    """Deleting a non-existent ritalin ID returns 200 and causes no error."""
+    test_client, _, token = auth_token
+    response = test_client.delete(
+        "/ritalin-events", json={"ids": ["does-not-exist"]}, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+
+
+def test_delete_ritalin_events_only_affects_requesting_user(auth_token):
+    """A user cannot delete another user's ritalin events."""
+    test_client, _, token1 = auth_token
+    headers1 = {"Authorization": f"Bearer {token1}"}
+
+    code2 = test_client.post("/generate-code").get_json()["code"]
+    token2 = test_client.post("/generate-token", json={"code": code2}).get_json()["token"]
+    headers2 = {"Authorization": f"Bearer {token2}"}
+
+    test_client.post("/ritalin-events", json={"event": _valid_event(id="shared-id")}, headers=headers2)
+
+    test_client.delete("/ritalin-events", json={"ids": ["shared-id"]}, headers=headers1)
+
+    events = test_client.get("/ritalin-events", headers=headers2).get_json()["events"]
+    assert len(events) == 1
+
+
+def test_delete_ritalin_events_missing_ids_key_returns_400(auth_token):
+    """DELETE /ritalin-events without 'ids' key returns 400."""
+    test_client, _, token = auth_token
+    response = test_client.delete(
+        "/ritalin-events", json={"not_ids": []}, headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 400

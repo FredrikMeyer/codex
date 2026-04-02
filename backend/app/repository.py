@@ -340,6 +340,34 @@ class LogRepository:
                 if entry.get("code") == code
             ]
 
+    def delete_events(self, code: str, ids: List[str]) -> None:
+        """Remove asthma events by ID for a user. Unknown IDs are silently ignored."""
+        id_set = set(ids)
+        with self._lock:
+            data = load_data(self.data_file)
+            data["events"] = [
+                entry for entry in data.get("events", [])
+                if not (entry.get("code") == code and entry["event"].get("id") in id_set)
+            ]
+            save_data(self.data_file, data)
+            if self._sqlite:
+                for event_id in ids:
+                    self._sqlite.delete_event(code, event_id)
+
+    def delete_ritalin_events(self, code: str, ids: List[str]) -> None:
+        """Remove ritalin events by ID for a user. Unknown IDs are silently ignored."""
+        id_set = set(ids)
+        with self._lock:
+            data = load_data(self.data_file)
+            data["ritalin_events"] = [
+                entry for entry in data.get("ritalin_events", [])
+                if not (entry.get("code") == code and entry["event"].get("id") in id_set)
+            ]
+            save_data(self.data_file, data)
+            if self._sqlite:
+                for event_id in ids:
+                    self._sqlite.delete_ritalin_event(code, event_id)
+
     def code_exists(self, code: str) -> bool:
         """
         Check if a code exists in the system.
