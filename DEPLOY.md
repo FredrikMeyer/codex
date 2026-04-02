@@ -185,17 +185,17 @@ docker compose -f docker-compose.prod.yml logs --tail=50 -f
 ### When `docker-compose.prod.yml` itself changes
 
 The Docker image updates automatically, but the compose file on the server does **not** —
-it must be copied manually whenever it changes (new env vars, volume mounts, etc.).
+it must be updated manually whenever it changes (new env vars, volume mounts, etc.).
 
 ```bash
-# From your local machine
-scp backend/docker-compose.prod.yml <user>@<server>:/var/www/codex/backend/docker-compose.prod.yml
+# On the server — re-download the latest compose file
+curl -O https://raw.githubusercontent.com/FredrikMeyer/codex/main/backend/docker-compose.prod.yml
 
-# Then on the server, restart to pick up the new config
+# Then restart to pick up the new config
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Check the git log for compose file changes before deploying:
+Check the git log to see if the compose file changed before deploying:
 
 ```bash
 git log --oneline -- backend/docker-compose.prod.yml
