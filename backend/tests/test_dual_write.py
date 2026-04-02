@@ -58,6 +58,7 @@ def test_generate_token_idempotent_still_syncs_to_sqlite(code_repo: CodeReposito
     token1 = code_repo.generate_token("ABC123")
     token2 = code_repo.generate_token("ABC123")
     assert token1 == token2
+    assert token1 is not None
     assert sqlite.validate_token(token1)
 
 
