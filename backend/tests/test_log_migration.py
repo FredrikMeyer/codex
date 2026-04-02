@@ -7,8 +7,6 @@ New format: data["events"] contains entries with {code, event: {id, date, timest
 
 from pathlib import Path
 
-import pytest
-
 from app.repository import LogRepository
 from app.storage import save_data
 

@@ -1,6 +1,7 @@
 # Asthma Medicine Tracker
 
-[![Backend CI](https://github.com/FredrikMeyer/codex/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/FredrikMeyer/codex/actions/workflows/backend-ci.yml)
+[![Backend CI](https://github.com/FredrikMeyer/codex/actions/workflows/ci.yml/badge.svg)](https://github.com/FredrikMeyer/codex/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/FredrikMeyer/codex/graph/badge.svg?token=BJSBmRNGHK)](https://codecov.io/gh/FredrikMeyer/codex)
 
 Offline-friendly web app for logging daily asthma medication usage and exporting a CSV history.
 

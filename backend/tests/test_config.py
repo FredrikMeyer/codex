@@ -5,7 +5,6 @@ The app should load configuration from environment variables,
 with sensible defaults when variables are not set.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -33,7 +32,7 @@ def test_loads_allowed_origins_from_env(tmp_path: Path, monkeypatch, clean_env):
 
 def test_defaults_to_wildcard_when_allowed_origins_not_set(tmp_path: Path, clean_env):
     """App defaults to '*' for ALLOWED_ORIGINS when not set."""
-    app = create_app(tmp_path / "data.json")
+    create_app(tmp_path / "data.json")
 
     # Should default to allowing all origins
     # This is checked by CORS behavior in test_cors.py

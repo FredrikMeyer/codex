@@ -63,6 +63,21 @@ cd backend
 
 case "$1" in
     --ci)
+        echo -e "${YELLOW}🔍 Running linting with ruff${NC}"
+        echo ""
+        uv run ruff check app tests
+        RUFF_EXIT_CODE=$?
+
+        if [ $RUFF_EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}✓ Linting passed!${NC}"
+        else
+            echo ""
+            echo -e "${RED}✗ Linting failed${NC}"
+            exit $RUFF_EXIT_CODE
+        fi
+
+        echo ""
         echo -e "${YELLOW}🔍 Running type checking with ty${NC}"
         echo ""
         uv run ty check app tests
@@ -140,6 +155,21 @@ case "$1" in
         uv run pytest-watch
         ;;
     "")
+        echo -e "${YELLOW}🔍 Running linting with ruff${NC}"
+        echo ""
+        uv run ruff check app tests
+        RUFF_EXIT_CODE=$?
+
+        if [ $RUFF_EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}✓ Linting passed!${NC}"
+        else
+            echo ""
+            echo -e "${RED}✗ Linting failed${NC}"
+            exit $RUFF_EXIT_CODE
+        fi
+
+        echo ""
         echo -e "${YELLOW}🔍 Running type checking with ty${NC}"
         echo ""
         uv run ty check app tests
