@@ -24,7 +24,7 @@ from .sqlite_storage import SqliteStorage
 
 
 class BaseEvent(BaseModel):
-    """Common fields for all tracking events."""
+    """Common fields for all events."""
 
     model_config = ConfigDict(extra="forbid")
 
