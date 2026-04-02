@@ -137,3 +137,40 @@ def test_get_ritalin_events_filters_by_code(storage: SqliteStorage) -> None:
     storage.insert_ritalin_event("USER2", _ritalin_event(id="r2"), "2026-03-01T08:01:00Z")
     assert len(storage.get_ritalin_events("USER1")) == 1
     assert storage.get_ritalin_events("USER1")[0]["id"] == "r1"
+
+
+# --- token queries ---
+
+def test_validate_token_returns_false_when_no_codes(storage: SqliteStorage) -> None:
+    assert storage.validate_token("tok") is False
+
+
+def test_validate_token_returns_false_for_code_without_token(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry())
+    assert storage.validate_token("tok") is False
+
+
+def test_validate_token_returns_true_for_valid_token(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="tok123"))
+    assert storage.validate_token("tok123") is True
+
+
+def test_validate_token_returns_false_for_wrong_token(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="tok123"))
+    assert storage.validate_token("wrong") is False
+
+
+def test_get_code_for_token_returns_none_when_not_found(storage: SqliteStorage) -> None:
+    assert storage.get_code_for_token("tok") is None
+
+
+def test_get_code_for_token_returns_correct_code(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(code="ABC123", token="tok123"))
+    assert storage.get_code_for_token("tok123") == "ABC123"
+
+
+def test_get_code_for_token_isolates_codes(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(code="USER1", token="tok-a"))
+    storage.upsert_code(_code_entry(code="USER2", token="tok-b"))
+    assert storage.get_code_for_token("tok-a") == "USER1"
+    assert storage.get_code_for_token("tok-b") == "USER2"

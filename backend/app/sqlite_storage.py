@@ -206,6 +206,22 @@ class SqliteStorage:
             )
             self._conn.commit()
 
+    def validate_token(self, token: str) -> bool:
+        """Return True if the token matches any stored code entry."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM codes WHERE token = ?", (token,)
+            ).fetchone()
+            return row is not None
+
+    def get_code_for_token(self, token: str) -> str | None:
+        """Return the code associated with a token, or None if not found."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT code FROM codes WHERE token = ?", (token,)
+            ).fetchone()
+            return row["code"] if row else None
+
     def close(self) -> None:
         """Close the database connection."""
         self._conn.close()
