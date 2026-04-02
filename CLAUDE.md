@@ -14,6 +14,7 @@ After making any code changes, ALWAYS run `./test.sh` before considering the wor
 - If tests fail, fix the issues before moving on
 - Never skip this step, even for "simple" changes
 - ALWAYS run the full test suite before finishing a task or making the final commit
+- **Never use `--fast` before a commit** — it skips `ty` type checking, which CI always runs. `--fast` is only acceptable for intermediate development iteration, never as the final check before committing.
 
 ## Committing Tests With Code
 Always commit tests in the same commit as the code they test. Never commit a new function and its unit tests as separate commits.
