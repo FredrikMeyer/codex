@@ -39,28 +39,17 @@ export async function apiFetchCode(token) {
 }
 
 export async function apiUploadEvents(token, events) {
-  let successCount = 0;
-  let errorCount = 0;
-  for (const event of events) {
-    const { received_at: _received_at, ...eventData } = event;
-    try {
-      const response = await fetch(`${backendUrl}/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ event: eventData })
-      });
-      if (response.ok) {
-        successCount++;
-      } else {
-        errorCount++;
-        console.error(`Failed to sync event ${event.id}:`, await response.text());
-      }
-    } catch (error) {
-      errorCount++;
-      console.error(`Network error syncing event ${event.id}:`, error);
-    }
+  const cleanEvents = events.map(({ received_at: _received_at, ...eventData }) => eventData);
+  const response = await fetch(`${backendUrl}/events/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ events: cleanEvents })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to upload events: ${response.status}`);
   }
-  return { successCount, errorCount };
+  const { saved } = await response.json();
+  return { successCount: saved, errorCount: 0 };
 }
 
 export async function apiDownloadEvents(token) {
@@ -78,26 +67,17 @@ export async function apiDownloadEvents(token) {
 }
 
 export async function apiUploadRitalinEvents(token, events) {
-  let successCount = 0;
-  let errorCount = 0;
-  for (const event of events) {
-    const { received_at: _received_at, ...eventData } = event;
-    try {
-      const response = await fetch(`${backendUrl}/ritalin-events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ event: eventData })
-      });
-      if (response.ok) {
-        successCount++;
-      } else {
-        errorCount++;
-      }
-    } catch (_) {
-      errorCount++;
-    }
+  const cleanEvents = events.map(({ received_at: _received_at, ...eventData }) => eventData);
+  const response = await fetch(`${backendUrl}/ritalin-events/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ events: cleanEvents })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to upload ritalin events: ${response.status}`);
   }
-  return { successCount, errorCount };
+  const { saved } = await response.json();
+  return { successCount: saved, errorCount: 0 };
 }
 
 export async function apiDownloadRitalinEvents(token) {

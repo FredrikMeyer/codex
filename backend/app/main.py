@@ -2,13 +2,11 @@
 import logging
 import os
 import random
-import secrets
 import string
-import threading
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +18,7 @@ from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from .repository import LogRepository
-from .storage import load_data, save_data
+from .repository import CodeRepository, LogRepository
 
 
 
@@ -152,21 +149,12 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         response.headers['Retry-After'] = str(retry_after)
         return response, 429
 
-    # Create repository for data access
+    # Create repositories for data access
+    code_repository = CodeRepository(app.config["DATA_FILE"])
     log_repository = LogRepository(app.config["DATA_FILE"])
 
     # Migrate old log entries to the event format on startup (idempotent)
     log_repository.migrate_logs_to_events()
-
-    data_lock = threading.Lock()
-
-    def read_data() -> Dict[str, Any]:
-        with data_lock:
-            return load_data(app.config["DATA_FILE"])
-
-    def write_data(data: Dict[str, Any]) -> None:
-        with data_lock:
-            save_data(app.config["DATA_FILE"], data)
 
     def require_auth() -> Callable:
         """Decorator to require token authentication."""
@@ -189,15 +177,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
                 if not token:
                     return jsonify({"error": "Token required"}), 401
 
-                # Validate token against stored tokens
-                data = read_data()
-                valid_tokens = [
-                    entry.get("token")
-                    for entry in data.get("codes", [])
-                    if "token" in entry
-                ]
-
-                if token not in valid_tokens:
+                if not code_repository.validate_token(token):
                     return jsonify({"error": "Invalid token"}), 401
 
                 # Token is valid, proceed
@@ -210,11 +190,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
     @limiter.limit("5 per hour")
     def generate_code() -> Any:
         code = _generate_code()
-        data = read_data()
-        data["codes"].append(
-            {"code": code, "created_at": datetime.now(timezone.utc).isoformat()}
-        )
-        write_data(data)
+        code_repository.create_code(code)
         return jsonify({"code": code})
 
     @app.post("/login")
@@ -225,14 +201,10 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         if not code:
             return jsonify({"error": "Code is required"}), 400
 
-        data = read_data()
-        for entry in data.get("codes", []):
-            if entry["code"] == code:
-                entry["last_login_at"] = datetime.now(timezone.utc).isoformat()
-                write_data(data)
-                return jsonify({"status": "ok"})
+        if not code_repository.record_login(code):
+            return jsonify({"error": "Invalid code"}), 400
 
-        return jsonify({"error": "Invalid code"}), 400
+        return jsonify({"status": "ok"})
 
     @app.post("/generate-token")
     @limiter.limit("10 per minute")
@@ -243,30 +215,10 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         if not code:
             return jsonify({"error": "Code is required"}), 400
 
-        data = read_data()
+        token = code_repository.generate_token(code)
 
-        # Find the code entry
-        code_entry = None
-        for entry in data.get("codes", []):
-            if entry["code"] == code:
-                code_entry = entry
-                break
-
-        if not code_entry:
+        if token is None:
             return jsonify({"error": "Invalid code"}), 400
-
-        # If token already exists, return it
-        if "token" in code_entry:
-            return jsonify({"token": code_entry["token"]})
-
-        # Generate new token (32 bytes = 64 hex characters)
-        token = secrets.token_hex(32)
-
-        # Store token with code
-        code_entry["token"] = token
-        code_entry["token_generated_at"] = datetime.now(timezone.utc).isoformat()
-
-        write_data(data)
 
         return jsonify({"token": token})
 
@@ -290,13 +242,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]  # "Bearer <token>"
 
-        # Find code associated with this token
-        data = read_data()
-        code = None
-        for entry in data.get("codes", []):
-            if entry.get("token") == token:
-                code = entry["code"]
-                break
+        code = code_repository.get_code_for_token(token)
 
         if not code:
             return jsonify({"error": "Code not found for this token"}), 404
@@ -317,7 +263,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
             JSON: {"event": {"id", "date", "timestamp", "type", "count", "preventive"}}
 
         Returns:
-            JSON: {"status": "saved"} or {"status": "duplicate"} if id already exists
+            JSON: {"status": "saved"}
         """
         payload = request.get_json(silent=True) or {}
         event = payload.get("event")
@@ -336,16 +282,55 @@ def create_app(data_file: str | Path | None = None) -> Flask:
 
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]
-        data = read_data()
-        code = next(
-            (entry["code"] for entry in data.get("codes", []) if entry.get("token") == token),
-            None,
-        )
+        code = code_repository.get_code_for_token(token)
         if not code:
             return jsonify({"error": "Invalid token"}), 401
 
         log_repository.save_event(code, event)
         return jsonify({"status": "saved"})
+
+    @app.post("/events/batch")
+    @require_auth()
+    @limiter.limit("20 per minute")
+    def save_events_batch() -> Any:
+        """
+        Save multiple asthma usage events in one request.
+
+        Requires:
+            Authorization: Bearer <token> header
+
+        Body:
+            JSON: {"events": [{"id", "date", "timestamp", "type", "count", "preventive"}, ...]}
+
+        Returns:
+            JSON: {"saved": N, "duplicates": M}
+        """
+        payload = request.get_json(silent=True) or {}
+        events = payload.get("events")
+
+        if not isinstance(events, list):
+            return jsonify({"error": "'events' (array) is required"}), 400
+
+        for event in events:
+            if not isinstance(event, dict):
+                return jsonify({"error": "Each event must be an object"}), 400
+            try:
+                AsthmaMedicineEvent(**event)
+            except ValidationError as e:
+                first_error = e.errors()[0]
+                field = first_error["loc"][0] if first_error["loc"] else "event"
+                message = first_error["msg"]
+                logger.warning("Invalid asthma event rejected: %s (field=%s, payload=%r)", message, field, event)
+                return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
+
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]
+        code = code_repository.get_code_for_token(token)
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        saved = log_repository.save_events_batch(code, events)
+        return jsonify({"saved": saved, "duplicates": len(events) - saved})
 
     @app.get("/events")
     @require_auth()
@@ -362,11 +347,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         """
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]
-        data = read_data()
-        code = next(
-            (entry["code"] for entry in data.get("codes", []) if entry.get("token") == token),
-            None,
-        )
+        code = code_repository.get_code_for_token(token)
         if not code:
             return jsonify({"error": "Invalid token"}), 401
 
@@ -386,7 +367,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
             JSON: {"event": {"id", "date", "timestamp", "count"}}
 
         Returns:
-            JSON: {"status": "saved"} or {"status": "duplicate"} if id already exists
+            JSON: {"status": "saved"}
         """
         payload = request.get_json(silent=True) or {}
         event = payload.get("event")
@@ -405,16 +386,55 @@ def create_app(data_file: str | Path | None = None) -> Flask:
 
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]
-        data = read_data()
-        code = next(
-            (entry["code"] for entry in data.get("codes", []) if entry.get("token") == token),
-            None,
-        )
+        code = code_repository.get_code_for_token(token)
         if not code:
             return jsonify({"error": "Invalid token"}), 401
 
         log_repository.save_ritalin_event(code, event)
         return jsonify({"status": "saved"})
+
+    @app.post("/ritalin-events/batch")
+    @require_auth()
+    @limiter.limit("20 per minute")
+    def save_ritalin_events_batch() -> Any:
+        """
+        Save multiple Ritalin dose events in one request.
+
+        Requires:
+            Authorization: Bearer <token> header
+
+        Body:
+            JSON: {"events": [{"id", "date", "timestamp", "count"}, ...]}
+
+        Returns:
+            JSON: {"saved": N, "duplicates": M}
+        """
+        payload = request.get_json(silent=True) or {}
+        events = payload.get("events")
+
+        if not isinstance(events, list):
+            return jsonify({"error": "'events' (array) is required"}), 400
+
+        for event in events:
+            if not isinstance(event, dict):
+                return jsonify({"error": "Each event must be an object"}), 400
+            try:
+                RitalinEvent(**event)
+            except ValidationError as e:
+                first_error = e.errors()[0]
+                field = first_error["loc"][0] if first_error["loc"] else "event"
+                message = first_error["msg"]
+                logger.warning("Invalid ritalin event rejected: %s (field=%s, payload=%r)", message, field, event)
+                return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
+
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.split()[1]
+        code = code_repository.get_code_for_token(token)
+        if not code:
+            return jsonify({"error": "Invalid token"}), 401
+
+        saved = log_repository.save_ritalin_events_batch(code, events)
+        return jsonify({"saved": saved, "duplicates": len(events) - saved})
 
     @app.get("/ritalin-events")
     @require_auth()
@@ -431,11 +451,7 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         """
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]
-        data = read_data()
-        code = next(
-            (entry["code"] for entry in data.get("codes", []) if entry.get("token") == token),
-            None,
-        )
+        code = code_repository.get_code_for_token(token)
         if not code:
             return jsonify({"error": "Invalid token"}), 401
 

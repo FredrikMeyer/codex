@@ -4,6 +4,7 @@ Repository layer for log and code storage.
 Provides framework-independent data access, hiding storage implementation details.
 """
 
+import secrets
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -11,6 +12,89 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .storage import load_data, save_data
+
+
+class CodeRepository:
+    """
+    Repository for managing authentication codes and tokens.
+
+    Hides the storage implementation and provides a clean interface
+    for code and token lifecycle operations.
+    """
+
+    def __init__(self, data_file: Path) -> None:
+        self.data_file = data_file
+        self._lock = threading.Lock()
+
+    def create_code(self, code: str) -> None:
+        """Store a new authentication code."""
+        with self._lock:
+            data = load_data(self.data_file)
+            data.setdefault("codes", []).append({
+                "code": code,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            save_data(self.data_file, data)
+
+    def record_login(self, code: str) -> bool:
+        """
+        Record a login attempt for a code.
+
+        Returns:
+            True if the code exists and login was recorded, False if not found.
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            for entry in data.get("codes", []):
+                if entry["code"] == code:
+                    entry["last_login_at"] = datetime.now(timezone.utc).isoformat()
+                    save_data(self.data_file, data)
+                    return True
+            return False
+
+    def generate_token(self, code: str) -> str | None:
+        """
+        Return the token for a code, generating one if it does not exist yet.
+
+        Returns:
+            The token string, or None if the code does not exist.
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            for entry in data.get("codes", []):
+                if entry["code"] == code:
+                    if "token" in entry:
+                        return entry["token"]
+                    token = secrets.token_hex(32)
+                    entry["token"] = token
+                    entry["token_generated_at"] = datetime.now(timezone.utc).isoformat()
+                    save_data(self.data_file, data)
+                    return token
+            return None
+
+    def get_code_for_token(self, token: str) -> str | None:
+        """
+        Return the code associated with a token.
+
+        Returns:
+            The code string, or None if the token is not recognised.
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            for entry in data.get("codes", []):
+                if entry.get("token") == token:
+                    return entry["code"]
+            return None
+
+    def validate_token(self, token: str) -> bool:
+        """Return True if the token is valid, False otherwise."""
+        with self._lock:
+            data = load_data(self.data_file)
+            return any(
+                entry.get("token") == token
+                for entry in data.get("codes", [])
+                if "token" in entry
+            )
 
 
 class LogRepository:
@@ -25,13 +109,33 @@ class LogRepository:
         self.data_file = data_file
         self._lock = threading.Lock()
 
+    def save_events_batch(self, code: str, events: List[Dict[str, Any]]) -> int:
+        """
+        Save multiple usage events in one operation, skipping any with IDs that already exist.
+
+        Returns the number of new events saved.
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            existing_ids = {
+                entry["event"].get("id")
+                for entry in data.get("events", [])
+                if entry.get("code") == code
+            }
+            received_at = datetime.now(timezone.utc).isoformat()
+            new_entries = [
+                {"code": code, "event": event_data, "received_at": received_at}
+                for event_data in events
+                if event_data.get("id") not in existing_ids
+            ]
+            if new_entries:
+                data.setdefault("events", []).extend(new_entries)
+                save_data(self.data_file, data)
+            return len(new_entries)
+
     def save_event(self, code: str, event_data: Dict[str, Any]) -> None:
         """
         Save a usage event for a user, skipping if the same id already exists.
-
-        Args:
-            code: User's authentication code
-            event_data: The event data (id, date, timestamp, type, count, preventive)
         """
         with self._lock:
             data = load_data(self.data_file)
@@ -135,13 +239,33 @@ class LogRepository:
                 data.setdefault("events", []).extend(new_entries)
                 save_data(self.data_file, data)
 
+    def save_ritalin_events_batch(self, code: str, events: List[Dict[str, Any]]) -> int:
+        """
+        Save multiple Ritalin dose events in one operation, skipping any with IDs that already exist.
+
+        Returns the number of new events saved.
+        """
+        with self._lock:
+            data = load_data(self.data_file)
+            existing_ids = {
+                entry["event"].get("id")
+                for entry in data.get("ritalin_events", [])
+                if entry.get("code") == code
+            }
+            received_at = datetime.now(timezone.utc).isoformat()
+            new_entries = [
+                {"code": code, "event": event_data, "received_at": received_at}
+                for event_data in events
+                if event_data.get("id") not in existing_ids
+            ]
+            if new_entries:
+                data.setdefault("ritalin_events", []).extend(new_entries)
+                save_data(self.data_file, data)
+            return len(new_entries)
+
     def save_ritalin_event(self, code: str, event_data: Dict[str, Any]) -> None:
         """
         Save a Ritalin dose event for a user, skipping if the same id already exists.
-
-        Args:
-            code: User's authentication code
-            event_data: The event data (id, date, timestamp, count)
         """
         with self._lock:
             data = load_data(self.data_file)

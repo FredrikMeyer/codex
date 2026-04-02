@@ -67,9 +67,6 @@ Background Sync API — queue events while offline, flush automatically when con
 
 ### Code quality
 
-**`app.js` is 632 lines doing too much**
-Handles event listeners, UI orchestration, sync logic, and state management. More to extract: a `syncService.js` for the cloud sync state machine, and moving edit dialog logic out.
-
 **`localStorage` → `IndexedDB`**
 localStorage is synchronous, size-limited (~5MB), and blocked in some private browsing modes. For a health app, IndexedDB is more reliable. The abstraction in `storage.js` makes this migration feasible without touching `app.js`.
 
