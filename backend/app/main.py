@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationEr
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .repository import CodeRepository, LogRepository
+from .sqlite_storage import SqliteStorage
 
 
 
@@ -81,7 +82,7 @@ def _generate_code() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 
-def create_app(data_file: str | Path | None = None) -> Flask:
+def create_app(data_file: str | Path | None = None, db_file: str | Path | None = None) -> Flask:
     # Load environment variables from .env file if present
     load_dotenv()
 
@@ -149,9 +150,13 @@ def create_app(data_file: str | Path | None = None) -> Flask:
         response.headers['Retry-After'] = str(retry_after)
         return response, 429
 
+    # Create SQLite storage if configured (dual-write alongside JSON)
+    resolved_db_file = db_file or os.environ.get("DB_FILE")
+    sqlite = SqliteStorage(resolved_db_file) if resolved_db_file else None
+
     # Create repositories for data access
-    code_repository = CodeRepository(app.config["DATA_FILE"])
-    log_repository = LogRepository(app.config["DATA_FILE"])
+    code_repository = CodeRepository(app.config["DATA_FILE"], sqlite=sqlite)
+    log_repository = LogRepository(app.config["DATA_FILE"], sqlite=sqlite)
 
     # Migrate old log entries to the event format on startup (idempotent)
     log_repository.migrate_logs_to_events()

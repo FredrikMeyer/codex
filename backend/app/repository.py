@@ -9,9 +9,24 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
+from .sqlite_storage import AsthmaMedicineEventData, CodeEntry, RitalinEventData, SqliteStorage
 from .storage import load_data, save_data
+
+
+def _to_code_entry(entry: Dict[str, Any]) -> CodeEntry:
+    result: CodeEntry = {
+        "code": entry["code"],
+        "created_at": entry["created_at"],
+    }
+    if "last_login_at" in entry:
+        result["last_login_at"] = entry["last_login_at"]
+    if "token" in entry:
+        result["token"] = entry["token"]
+    if "token_generated_at" in entry:
+        result["token_generated_at"] = entry["token_generated_at"]
+    return result
 
 
 class CodeRepository:
@@ -22,19 +37,20 @@ class CodeRepository:
     for code and token lifecycle operations.
     """
 
-    def __init__(self, data_file: Path) -> None:
+    def __init__(self, data_file: Path, sqlite: SqliteStorage | None = None) -> None:
         self.data_file = data_file
         self._lock = threading.Lock()
+        self._sqlite = sqlite
 
     def create_code(self, code: str) -> None:
         """Store a new authentication code."""
         with self._lock:
+            created_at = datetime.now(timezone.utc).isoformat()
             data = load_data(self.data_file)
-            data.setdefault("codes", []).append({
-                "code": code,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
+            data.setdefault("codes", []).append({"code": code, "created_at": created_at})
             save_data(self.data_file, data)
+            if self._sqlite:
+                self._sqlite.upsert_code(CodeEntry(code=code, created_at=created_at))
 
     def record_login(self, code: str) -> bool:
         """
@@ -49,6 +65,8 @@ class CodeRepository:
                 if entry["code"] == code:
                     entry["last_login_at"] = datetime.now(timezone.utc).isoformat()
                     save_data(self.data_file, data)
+                    if self._sqlite:
+                        self._sqlite.upsert_code(_to_code_entry(entry))
                     return True
             return False
 
@@ -63,13 +81,13 @@ class CodeRepository:
             data = load_data(self.data_file)
             for entry in data.get("codes", []):
                 if entry["code"] == code:
-                    if "token" in entry:
-                        return entry["token"]
-                    token = secrets.token_hex(32)
-                    entry["token"] = token
-                    entry["token_generated_at"] = datetime.now(timezone.utc).isoformat()
-                    save_data(self.data_file, data)
-                    return token
+                    if "token" not in entry:
+                        entry["token"] = secrets.token_hex(32)
+                        entry["token_generated_at"] = datetime.now(timezone.utc).isoformat()
+                        save_data(self.data_file, data)
+                    if self._sqlite:
+                        self._sqlite.upsert_code(_to_code_entry(entry))
+                    return entry["token"]
             return None
 
     def get_code_for_token(self, token: str) -> str | None:
@@ -105,9 +123,10 @@ class LogRepository:
     filtered by code) and provides a clean interface for data access.
     """
 
-    def __init__(self, data_file: Path):
+    def __init__(self, data_file: Path, sqlite: SqliteStorage | None = None):
         self.data_file = data_file
         self._lock = threading.Lock()
+        self._sqlite = sqlite
 
     def save_events_batch(self, code: str, events: List[Dict[str, Any]]) -> int:
         """
@@ -131,6 +150,9 @@ class LogRepository:
             if new_entries:
                 data.setdefault("events", []).extend(new_entries)
                 save_data(self.data_file, data)
+                if self._sqlite:
+                    for entry in new_entries:
+                        self._sqlite.insert_event(code, cast(AsthmaMedicineEventData, entry["event"]), received_at)
             return len(new_entries)
 
     def save_event(self, code: str, event_data: Dict[str, Any]) -> None:
@@ -148,12 +170,15 @@ class LogRepository:
                 }
                 if event_id in existing_ids:
                     return
+            received_at = datetime.now(timezone.utc).isoformat()
             data.setdefault("events", []).append({
                 "code": code,
                 "event": event_data,
-                "received_at": datetime.now(timezone.utc).isoformat(),
+                "received_at": received_at,
             })
             save_data(self.data_file, data)
+            if self._sqlite:
+                self._sqlite.insert_event(code, cast(AsthmaMedicineEventData, event_data), received_at)
 
     def get_events(self, code: str) -> List[Dict[str, Any]]:
         """
@@ -261,6 +286,9 @@ class LogRepository:
             if new_entries:
                 data.setdefault("ritalin_events", []).extend(new_entries)
                 save_data(self.data_file, data)
+                if self._sqlite:
+                    for entry in new_entries:
+                        self._sqlite.insert_ritalin_event(code, cast(RitalinEventData, entry["event"]), received_at)
             return len(new_entries)
 
     def save_ritalin_event(self, code: str, event_data: Dict[str, Any]) -> None:
@@ -278,12 +306,15 @@ class LogRepository:
                 }
                 if event_id in existing_ids:
                     return
+            received_at = datetime.now(timezone.utc).isoformat()
             data.setdefault("ritalin_events", []).append({
                 "code": code,
                 "event": event_data,
-                "received_at": datetime.now(timezone.utc).isoformat(),
+                "received_at": received_at,
             })
             save_data(self.data_file, data)
+            if self._sqlite:
+                self._sqlite.insert_ritalin_event(code, cast(RitalinEventData, event_data), received_at)
 
     def get_ritalin_events(self, code: str) -> List[Dict[str, Any]]:
         """
