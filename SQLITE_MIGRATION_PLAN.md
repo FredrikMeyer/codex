@@ -9,21 +9,20 @@ Replace the current JSON file storage (`storage.json`) with SQLite, while:
 
 ---
 
-## Current Architecture
+## Current Architecture (after Steps 1 & 2)
 
 ```
-main.py  ──read_data()/write_data()──►  storage.py  ──► storage.json
+main.py  ──► CodeRepository  ──► storage.py  ──► storage.json
               (codes management)
 
-repository.py (LogRepository)
-  ──load_data()/save_data()──►  storage.py  ──► storage.json
-     (events, ritalin_events)
+main.py  ──► LogRepository   ──► storage.py  ──► storage.json
+              (events, ritalin_events)
+
+sqlite_storage.py  ──► codex.db   (exists, tested, not yet wired to repositories)
 ```
 
-`main.py` directly calls `load_data`/`save_data` for all `codes` operations
-(generate-code, login, generate-token, get-code, require_auth token lookup).
-
-`repository.py` calls `load_data`/`save_data` for asthma events and ritalin events.
+`CodeRepository` and `LogRepository` are fully extracted. `main.py` has no direct storage
+calls. Both repositories still use the JSON backend exclusively.
 
 ---
 
@@ -80,108 +79,90 @@ No foreign key constraints — keeps migration and tooling simple.
 
 ---
 
+## Backward Compatibility Principle
+
+**Write to both JSON and SQLite until the very last step.** At every intermediate step the
+JSON file remains a consistent, up-to-date copy of all data. Rolling back to JSON-only is
+always possible by reverting a single commit.
+
+---
+
 ## Incremental Steps (Expand → Migrate → Contract)
 
 Every step must leave all tests passing before proceeding to the next.
 
-### Step 1 — Add `sqlite_storage.py` alongside `storage.py`
+### Step 1 — Add `sqlite_storage.py` alongside `storage.py` ✅ DONE
 
-Create `backend/app/sqlite_storage.py` with:
-- `init_db(path: Path) -> sqlite3.Connection` — creates tables if they don't exist, returns
-  a thread-safe connection wrapper
-- `SqliteStorage` class wrapping a `sqlite3.Connection` with the same conceptual operations
-  the rest of the app needs:
-  - `get_codes() → list[dict]`
-  - `upsert_code(code_entry: dict) → None`
-  - `get_events(code: str) → list[dict]`
-  - `insert_event(code: str, event: dict, received_at: str) → None` (no-op if id exists)
-  - `get_ritalin_events(code: str) → list[dict]`
-  - `insert_ritalin_event(code: str, event: dict, received_at: str) → None` (no-op if id exists)
+`SqliteStorage` class with `get_codes`, `upsert_code`, `insert_event`, `get_events`,
+`insert_ritalin_event`, `get_ritalin_events`. Fully tested. JSON storage untouched.
 
-Use `sqlite3.connect(path, check_same_thread=False)` with `isolation_level=None` (autocommit).
-Serialise all writes with a `threading.Lock` (same approach as the current JSON storage).
+### Step 2 — Add `CodeRepository` to `repository.py` ✅ DONE
 
-Write unit tests covering all methods. ✅ Tests pass.
+`CodeRepository` extracted from `main.py`, backed by JSON. `main.py` updated to use it.
+Tests written and passing.
 
-### Step 2 — Add `CodeRepository` to `repository.py`
+### Step 3 — Expand `SqliteStorage` with missing code-query methods
 
-Move all codes-related logic out of `main.py` into a new `CodeRepository` class in
-`repository.py`:
+`CodeRepository` needs two read operations that `SqliteStorage` does not yet have:
+- `get_code_for_token(token: str) -> str | None`
+- `validate_token(token: str) -> bool`
 
-```python
-class CodeRepository:
-    def create_code(self, code: str) -> None: ...
-    def record_login(self, code: str) -> bool: ...          # returns False if code not found
-    def generate_token(self, code: str) -> str | None: ...  # returns existing or new token
-    def get_code_for_token(self, token: str) -> str | None: ...
-    def validate_token(self, token: str) -> bool: ...
-```
+Add these to `SqliteStorage` with tests. No callers change yet. ✅ Tests pass.
 
-At this step, implement `CodeRepository` backed by the *existing* `load_data`/`save_data`
-(JSON), just like `LogRepository`. This moves the logic without changing storage.
+### Step 4 — Dual-write: repositories write to JSON *and* SQLite ✅ DONE
 
-Update `main.py` to use `CodeRepository` instead of inline `read_data()`/`write_data()`.
+Change `CodeRepository` and `LogRepository` constructors to accept both a `Path` (JSON)
+and a `SqliteStorage` instance. Every mutation writes to **both** backends. Reads continue
+to come from JSON (no behaviour change, easy rollback).
 
-Write unit tests for `CodeRepository`. ✅ Tests pass.
+`create_app()` creates one `SqliteStorage(DB_FILE)` and passes it alongside the existing
+`DATA_FILE` path to both repositories. Both `docker-compose.yml` and `docker-compose.prod.yml`
+set `DB_FILE=/app/data/codex.db` so dual-write is active in production from this step.
 
-### Step 3 — Wire both repositories to `SqliteStorage`
+All existing tests pass unchanged (they use JSON fixtures). Integration tests confirm
+SQLite receives the same data on each write. ✅ Tests pass.
 
-Replace the `load_data`/`save_data` calls inside `LogRepository` and `CodeRepository` with
-calls to `SqliteStorage`.
+### Step 5 — One-time startup migration: JSON → SQLite
 
-`create_app()` changes:
-- Read `DB_FILE` env var (default `backend/data/codex.db`) instead of `DATA_FILE`
-- Create a single `SqliteStorage` instance
-- Pass it to both `CodeRepository(storage)` and `LogRepository(storage)`
-
-Keep `DATA_FILE` env var as a fallback alias during the transition (log a deprecation warning
-if it is set).
-
-All existing tests must still pass, now running against an in-memory SQLite db
-(`":memory:"`). ✅ Tests pass.
-
-### Step 4 — One-time data migration on startup
-
-Add `migrate_json_to_sqlite(json_path: Path, storage: SqliteStorage) -> None` in a new
+Add `migrate_json_to_sqlite(json_path: Path, storage: SqliteStorage) -> None` in
 `backend/app/migrate.py`:
 
 1. If `json_path` does not exist → skip (fresh install).
 2. Load JSON.
-3. Insert all `codes` entries (skip duplicates via `INSERT OR IGNORE`).
-4. Insert all `events` entries (skip duplicates).
-5. Insert all `ritalin_events` entries (skip duplicates).
-6. Write a sentinel file `json_path.with_suffix('.migrated')` so the migration never runs
-   twice.
+3. Insert all `codes` via `upsert_code` (idempotent).
+4. Insert all `events` via `insert_event` with `INSERT OR IGNORE`.
+5. Insert all `ritalin_events` via `insert_ritalin_event` with `INSERT OR IGNORE`.
+6. Write sentinel file `json_path.with_suffix('.migrated')` so it never runs twice.
 
-Call this from `create_app()` before the app starts serving requests:
+Call from `create_app()` before serving requests. After this step SQLite is fully populated
+with all historical data *and* receives every new write via Step 4's dual-write.
 
-```python
-if json_path.exists() and not sentinel.exists():
-    migrate_json_to_sqlite(json_path, storage)
-```
+Write tests covering migrated data is readable through repositories. ✅ Tests pass.
 
-Write a test that verifies migrated data is readable through the repositories.
-✅ Tests pass.
+### Step 6 — Switch reads to SQLite
 
-### Step 5 — Update `docker-compose.yml`
+Change `CodeRepository` and `LogRepository` to read from `SqliteStorage` instead of JSON.
+Writes still go to both (dual-write continues — JSON remains a live backup).
 
-```yaml
-environment:
-  - PRODUCTION=true
-  - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://fredrikmeyer.github.io}
-  - DB_FILE=/app/data/codex.db
-  # DATA_FILE kept pointing at old JSON so migration runs once, then ignored
-  - DATA_FILE=/app/data/storage.json
-```
+This is the first step where SQLite becomes the source of truth for reads. Rollback is still
+one commit away: swap reads back to JSON.
 
-Volume mount stays the same: `./data:/app/data`
+Update test fixtures to use `SqliteStorage(':memory:')` as the primary. ✅ Tests pass.
 
-### Step 6 — Remove `storage.py` and `DATA_FILE` references
+### Step 7 — Deploy and verify SQLite reads
 
-Once the migration has run in production (confirmed via logs), in a follow-up commit:
+Deploy and verify via logs that the migration sentinel is written and SQLite reads are
+serving requests correctly.
+
+### Step 8 — Contract: stop JSON writes, remove `storage.py`
+
+Once production is confirmed stable on SQLite reads (Step 7), in a follow-up commit:
+- Remove the `Path`/JSON arguments from `CodeRepository` and `LogRepository`
 - Delete `storage.py`
-- Remove `DATA_FILE` fallback code from `create_app()`
-- Remove `DATA_FILE` from `docker-compose.yml`
+- Remove `DATA_FILE` from `create_app()` and `docker-compose.yml`
+- Remove `migrate_json_to_sqlite` call from `create_app()` (migration is history)
+
+JSON file on disk is kept as a static backup but no longer written to. ✅ Tests pass.
 
 ---
 
@@ -254,18 +235,22 @@ ssh droplet "cat ~/codex/backend/data/backups/\$(ls -1 ~/codex/backend/data/back
 
 ## File Changelist Summary
 
-| Action | File |
-|--------|------|
-| Create | `backend/app/sqlite_storage.py` |
-| Create | `backend/app/migrate.py` |
-| Create | `backend/backup.py` |
-| Create | `backend/tests/test_sqlite_storage.py` |
-| Create | `backend/tests/test_migrate.py` |
-| Create | `fetch-backup.sh` |
-| Modify | `backend/app/repository.py` — add `CodeRepository`, swap to `SqliteStorage` |
-| Modify | `backend/app/main.py` — use `CodeRepository`, use `DB_FILE` |
-| Modify | `backend/docker-compose.yml` — add `DB_FILE`, keep `DATA_FILE` for migration |
-| Delete (later) | `backend/app/storage.py` |
+| Action | File | Status |
+|--------|------|--------|
+| Create | `backend/app/sqlite_storage.py` | ✅ Done |
+| Create | `backend/tests/test_sqlite_storage.py` | ✅ Done |
+| Create | `backend/tests/test_code_repository.py` | ✅ Done |
+| Modify | `backend/app/repository.py` — add `CodeRepository` (JSON-backed) | ✅ Done |
+| Modify | `backend/app/main.py` — use `CodeRepository` | ✅ Done |
+| Modify | `backend/app/sqlite_storage.py` — add `get_code_for_token`, `validate_token` | Step 3 |
+| Modify | `backend/app/repository.py` — dual-write JSON + SQLite | ✅ Done |
+| Modify | `backend/docker-compose.yml` and `docker-compose.prod.yml` — add `DB_FILE` | ✅ Done |
+| Create | `backend/app/migrate.py` | Step 5 |
+| Create | `backend/tests/test_migrate.py` | Step 5 |
+| Modify | `backend/app/repository.py` — switch reads to SQLite | Step 6 |
+| Create | `backend/backup.py` | Step 7 |
+| Create | `fetch-backup.sh` | Step 7 |
+| Delete | `backend/app/storage.py` | Step 8 |
 
 ---
 

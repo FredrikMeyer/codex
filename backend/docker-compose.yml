@@ -17,6 +17,7 @@ services:
       - PRODUCTION=true
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://fredrikmeyer.github.io}
       - DATA_FILE=/app/data/storage.json
+      - DB_FILE=/app/data/codex.db
 
     # Persist data between container restarts
     volumes:
