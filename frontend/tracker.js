@@ -100,6 +100,54 @@ export function weeklyRescueSummary(events) {
   return { thisWeek, lastWeek, delta: thisWeek - lastWeek };
 }
 
+export function aggregateByMonth(events, months = 6) {
+  const today = Temporal.Now.plainDateISO();
+  const startDate = today.subtract({ months: months - 1 }).with({ day: 1 });
+
+  const result = [];
+  for (let m = 0; m < months; m++) {
+    const monthStart = startDate.add({ months: m });
+    const monthStr = monthStart.toString().slice(0, 7);
+    const monthEvents = events.filter((e) => e.date.startsWith(monthStr));
+
+    const preventive = monthEvents
+      .filter((e) => e.preventive)
+      .reduce((sum, e) => sum + e.count, 0);
+    const rescue = monthEvents
+      .filter((e) => !e.preventive)
+      .reduce((sum, e) => sum + e.count, 0);
+
+    const label = monthStart.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+    result.push({ month: monthStr, label, preventive, rescue, total: preventive + rescue });
+  }
+
+  return result;
+}
+
+export function worstWeeks(events, n = 3) {
+  const today = Temporal.Now.plainDateISO();
+  const cutoff = today.subtract({ weeks: 26 });
+
+  const weekMap = new Map();
+  for (const event of events) {
+    if (event.preventive) continue;
+    const date = Temporal.PlainDate.from(event.date);
+    if (Temporal.PlainDate.compare(date, cutoff) < 0) continue;
+
+    const weekStart = date.subtract({ days: date.dayOfWeek - 1 }).toString();
+    weekMap.set(weekStart, (weekMap.get(weekStart) || 0) + event.count);
+  }
+
+  return Array.from(weekMap.entries())
+    .map(([weekStart, rescueDoses]) => ({
+      weekStart,
+      rescueDoses,
+      aboveGinaThreshold: rescueDoses > 2,
+    }))
+    .sort((a, b) => b.rescueDoses - a.rescueDoses)
+    .slice(0, n);
+}
+
 export function updateEntry(entries, updatedEntry) {
   return entries.map((e) => (e.id === updatedEntry.id ? { ...updatedEntry } : e));
 }
