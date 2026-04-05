@@ -97,6 +97,8 @@ class CodeRepository:
         Returns:
             The code string, or None if the token is not recognised.
         """
+        if self._sqlite:
+            return self._sqlite.get_code_for_token(token)
         with self._lock:
             data = load_data(self.data_file)
             for entry in data.get("codes", []):
@@ -106,6 +108,8 @@ class CodeRepository:
 
     def validate_token(self, token: str) -> bool:
         """Return True if the token is valid, False otherwise."""
+        if self._sqlite:
+            return self._sqlite.validate_token(token)
         with self._lock:
             data = load_data(self.data_file)
             return any(
@@ -135,12 +139,15 @@ class LogRepository:
         Returns the number of new events saved.
         """
         with self._lock:
-            data = load_data(self.data_file)
-            existing_ids = {
-                entry["event"].get("id")
-                for entry in data.get("events", [])
-                if entry.get("code") == code
-            }
+            if self._sqlite:
+                existing_ids: set[str | None] = {e["id"] for e in self._sqlite.get_events(code)}
+            else:
+                data = load_data(self.data_file)
+                existing_ids = {
+                    entry["event"].get("id")
+                    for entry in data.get("events", [])
+                    if entry.get("code") == code
+                }
             received_at = datetime.now(timezone.utc).isoformat()
             new_entries = [
                 {"code": code, "event": event_data, "received_at": received_at}
@@ -148,6 +155,7 @@ class LogRepository:
                 if event_data.get("id") not in existing_ids
             ]
             if new_entries:
+                data = load_data(self.data_file)
                 data.setdefault("events", []).extend(new_entries)
                 save_data(self.data_file, data)
                 if self._sqlite:
@@ -160,17 +168,20 @@ class LogRepository:
         Save a usage event for a user, skipping if the same id already exists.
         """
         with self._lock:
-            data = load_data(self.data_file)
             event_id = event_data.get("id")
             if event_id:
-                existing_ids = {
-                    entry["event"].get("id")
-                    for entry in data.get("events", [])
-                    if entry.get("code") == code
-                }
+                if self._sqlite:
+                    existing_ids: set[str] = {e["id"] for e in self._sqlite.get_events(code)}
+                else:
+                    existing_ids = {
+                        entry["event"].get("id")
+                        for entry in load_data(self.data_file).get("events", [])
+                        if entry.get("code") == code
+                    }
                 if event_id in existing_ids:
                     return
             received_at = datetime.now(timezone.utc).isoformat()
+            data = load_data(self.data_file)
             data.setdefault("events", []).append({
                 "code": code,
                 "event": event_data,
@@ -190,6 +201,8 @@ class LogRepository:
         Returns:
             List of events with id, date, timestamp, type, count, preventive, received_at
         """
+        if self._sqlite:
+            return [cast(Dict[str, Any], e) for e in self._sqlite.get_events(code)]
         with self._lock:
             data = load_data(self.data_file)
             return [
@@ -271,12 +284,15 @@ class LogRepository:
         Returns the number of new events saved.
         """
         with self._lock:
-            data = load_data(self.data_file)
-            existing_ids = {
-                entry["event"].get("id")
-                for entry in data.get("ritalin_events", [])
-                if entry.get("code") == code
-            }
+            if self._sqlite:
+                existing_ids: set[str | None] = {e["id"] for e in self._sqlite.get_ritalin_events(code)}
+            else:
+                data = load_data(self.data_file)
+                existing_ids = {
+                    entry["event"].get("id")
+                    for entry in data.get("ritalin_events", [])
+                    if entry.get("code") == code
+                }
             received_at = datetime.now(timezone.utc).isoformat()
             new_entries = [
                 {"code": code, "event": event_data, "received_at": received_at}
@@ -284,6 +300,7 @@ class LogRepository:
                 if event_data.get("id") not in existing_ids
             ]
             if new_entries:
+                data = load_data(self.data_file)
                 data.setdefault("ritalin_events", []).extend(new_entries)
                 save_data(self.data_file, data)
                 if self._sqlite:
@@ -296,17 +313,20 @@ class LogRepository:
         Save a Ritalin dose event for a user, skipping if the same id already exists.
         """
         with self._lock:
-            data = load_data(self.data_file)
             event_id = event_data.get("id")
             if event_id:
-                existing_ids = {
-                    entry["event"].get("id")
-                    for entry in data.get("ritalin_events", [])
-                    if entry.get("code") == code
-                }
+                if self._sqlite:
+                    existing_ids: set[str] = {e["id"] for e in self._sqlite.get_ritalin_events(code)}
+                else:
+                    existing_ids = {
+                        entry["event"].get("id")
+                        for entry in load_data(self.data_file).get("ritalin_events", [])
+                        if entry.get("code") == code
+                    }
                 if event_id in existing_ids:
                     return
             received_at = datetime.now(timezone.utc).isoformat()
+            data = load_data(self.data_file)
             data.setdefault("ritalin_events", []).append({
                 "code": code,
                 "event": event_data,
@@ -326,6 +346,8 @@ class LogRepository:
         Returns:
             List of events with id, date, timestamp, count, received_at
         """
+        if self._sqlite:
+            return [cast(Dict[str, Any], e) for e in self._sqlite.get_ritalin_events(code)]
         with self._lock:
             data = load_data(self.data_file)
             return [

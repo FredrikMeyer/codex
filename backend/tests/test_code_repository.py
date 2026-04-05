@@ -14,7 +14,8 @@ from app.repository import CodeRepository
 
 @pytest.fixture()
 def repo(tmp_path: Path) -> CodeRepository:
-    return CodeRepository(tmp_path / "data.json")
+    from app.sqlite_storage import SqliteStorage
+    return CodeRepository(tmp_path / "data.json", sqlite=SqliteStorage(":memory:"))
 
 
 # --- create_code ---

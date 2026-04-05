@@ -14,9 +14,9 @@ from app.main import create_app
 
 @pytest.fixture()
 def client(tmp_path: Path):
-    """Create test client with temporary data file."""
+    """Create test client with temporary data file and in-memory SQLite."""
     data_file = tmp_path / "data.json"
-    app = create_app(data_file)
+    app = create_app(data_file, db_file=":memory:")
     app.config["TESTING"] = True
     with app.test_client() as test_client:
         yield test_client
