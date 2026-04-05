@@ -40,8 +40,8 @@ export function buildReportHtml(entries) {
         <h2>30-Day Trend</h2>
         <div class="chart">${chartSvg}</div>
         <div class="legend">
-          <span class="legend-spray">Preventive (spray)</span>
-          <span class="legend-ventoline">Rescue (ventoline)</span>
+          <span class="legend-spray">Preventive</span>
+          <span class="legend-ventoline">Rescue</span>
         </div>
       </section>`
     : '';

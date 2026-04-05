@@ -16,24 +16,23 @@ export function buildAsthmaChartSvg(events) {
   const chartWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
   const chartHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
 
-  const maxDoses = Math.max(...data.map((d) => d.spray + d.ventoline));
+  const maxDoses = Math.max(...data.map((d) => d.preventive + d.rescue));
   const barGroupWidth = chartWidth / data.length;
-  const barWidth = Math.min(barGroupWidth * 0.35, 18);
-  const gap = barWidth * 0.3;
+  const barWidth = Math.min(barGroupWidth * 0.6, 24);
   const barH = (value) => (value / maxDoses) * chartHeight;
   const barY = (value) => PAD_TOP + chartHeight - barH(value);
   const labelStep = Math.max(1, Math.ceil(data.length / 8));
 
   const elements = data.flatMap((d, i) => {
     const cx = PAD_LEFT + i * barGroupWidth + barGroupWidth / 2;
-    const sprayX = cx - barWidth - gap / 2;
-    const ventX = cx + gap / 2;
+    const barX = cx - barWidth / 2;
+    const total = d.preventive + d.rescue;
     const parts = [];
-    if (d.spray > 0) {
-      parts.push(`<rect class="bar-spray" x="${sprayX.toFixed(1)}" y="${barY(d.spray).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.spray).toFixed(1)}"><title>Spray: ${d.spray}</title></rect>`);
+    if (d.preventive > 0) {
+      parts.push(`<rect class="bar-spray" x="${barX.toFixed(1)}" y="${barY(d.preventive).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.preventive).toFixed(1)}"><title>Preventive: ${d.preventive}</title></rect>`);
     }
-    if (d.ventoline > 0) {
-      parts.push(`<rect class="bar-ventoline" x="${ventX.toFixed(1)}" y="${barY(d.ventoline).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.ventoline).toFixed(1)}"><title>Ventoline: ${d.ventoline}</title></rect>`);
+    if (d.rescue > 0) {
+      parts.push(`<rect class="bar-ventoline" x="${barX.toFixed(1)}" y="${barY(total).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH(d.rescue).toFixed(1)}"><title>Rescue: ${d.rescue}</title></rect>`);
     }
     if (i % labelStep === 0) {
       const label = Temporal.PlainDate.from(d.date).toLocaleString('en-GB', { month: 'short', day: 'numeric' });

@@ -50,14 +50,27 @@ test('sumForType sums counts for a given date and type', () => {
 test('aggregateByDate returns only days with data', () => {
   const today = Temporal.Now.plainDateISO().toString();
   const events = [
-    { date: today, type: 'ventoline', count: 2 },
-    { date: today, type: 'spray', count: 1 }
+    { date: today, type: 'ventoline', count: 2, preventive: false },
+    { date: today, type: 'spray', count: 1, preventive: true }
   ];
   const result = aggregateByDate(events);
   assert.equal(result.length, 1);
   assert.equal(result[0].date, today);
-  assert.equal(result[0].ventoline, 2);
-  assert.equal(result[0].spray, 1);
+  assert.equal(result[0].preventive, 1);
+  assert.equal(result[0].rescue, 2);
+});
+
+test('aggregateByDate stacks preventive and rescue doses separately', () => {
+  const today = Temporal.Now.plainDateISO().toString();
+  const events = [
+    { date: today, type: 'spray', count: 2, preventive: true },
+    { date: today, type: 'spray', count: 1, preventive: false },
+    { date: today, type: 'ventoline', count: 3, preventive: false }
+  ];
+  const result = aggregateByDate(events);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].preventive, 2);
+  assert.equal(result[0].rescue, 4);
 });
 
 test('aggregateByDate returns empty array when no events in window', () => {

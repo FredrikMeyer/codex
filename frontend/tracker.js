@@ -28,10 +28,11 @@ export function aggregateByDate(events, days = 30) {
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = daysAgoISO(i);
-    const spray = sumForType(events, date, 'spray');
-    const ventoline = sumForType(events, date, 'ventoline');
-    if (spray > 0 || ventoline > 0) {
-      result.push({ date, spray, ventoline });
+    const dayEvents = getEventsForDate(events, date);
+    const preventive = dayEvents.filter((e) => e.preventive).reduce((sum, e) => sum + e.count, 0);
+    const rescue = dayEvents.filter((e) => !e.preventive).reduce((sum, e) => sum + e.count, 0);
+    if (preventive > 0 || rescue > 0) {
+      result.push({ date, preventive, rescue });
     }
   }
   return result;
