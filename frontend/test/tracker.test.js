@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks } from '../tracker.js';
 
 test('generateId returns a non-empty string', () => {
   const id = generateId();
@@ -256,4 +256,114 @@ test('updateEntry returns unchanged array when id not found', () => {
   ];
   const result = updateEntry(entries, { id: 'z', date: '2024-01-01', type: 'spray', count: 1, preventive: false });
   assert.deepEqual(result, entries);
+});
+
+// aggregateByMonth
+
+test('aggregateByMonth returns 6 entries by default', () => {
+  const result = aggregateByMonth([]);
+  assert.equal(result.length, 6);
+});
+
+test('aggregateByMonth entries are sorted oldest first', () => {
+  const result = aggregateByMonth([]);
+  for (let i = 1; i < result.length; i++) {
+    assert.ok(result[i].month > result[i - 1].month);
+  }
+});
+
+test('aggregateByMonth last entry is current month', () => {
+  const currentMonth = Temporal.Now.plainDateISO().toString().slice(0, 7);
+  const result = aggregateByMonth([]);
+  assert.equal(result[result.length - 1].month, currentMonth);
+});
+
+test('aggregateByMonth separates preventive and rescue events', () => {
+  const currentMonth = Temporal.Now.plainDateISO().toString().slice(0, 7);
+  const events = [
+    { date: currentMonth + '-01', type: 'spray', count: 2, preventive: true },
+    { date: currentMonth + '-02', type: 'ventoline', count: 3, preventive: false },
+  ];
+  const result = aggregateByMonth(events);
+  const current = result[result.length - 1];
+  assert.equal(current.preventive, 2);
+  assert.equal(current.rescue, 3);
+  assert.equal(current.total, 5);
+});
+
+test('aggregateByMonth zero-fills months with no events', () => {
+  const result = aggregateByMonth([]);
+  assert.ok(result.every((m) => m.preventive === 0 && m.rescue === 0 && m.total === 0));
+});
+
+test('aggregateByMonth ignores events outside the window', () => {
+  const events = [{ date: '2000-01-01', type: 'ventoline', count: 5, preventive: false }];
+  const result = aggregateByMonth(events);
+  assert.ok(result.every((m) => m.rescue === 0));
+});
+
+// worstWeeks
+
+test('worstWeeks returns empty array for no events', () => {
+  assert.deepEqual(worstWeeks([]), []);
+});
+
+test('worstWeeks ignores preventive events', () => {
+  const today = Temporal.Now.plainDateISO().toString();
+  const events = [{ date: today, count: 5, preventive: true }];
+  assert.deepEqual(worstWeeks(events), []);
+});
+
+test('worstWeeks groups rescue events in same week', () => {
+  const today = Temporal.Now.plainDateISO();
+  const monday = today.subtract({ days: today.dayOfWeek - 1 }).toString();
+  const events = [
+    { date: monday, count: 2, preventive: false },
+    { date: monday, count: 1, preventive: false },
+  ];
+  const result = worstWeeks(events);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].rescueDoses, 3);
+  assert.equal(result[0].weekStart, monday);
+});
+
+test('worstWeeks flags weeks above GINA threshold', () => {
+  const monday = Temporal.Now.plainDateISO().subtract({ days: Temporal.Now.plainDateISO().dayOfWeek - 1 }).toString();
+  const events = [{ date: monday, count: 3, preventive: false }];
+  assert.equal(worstWeeks(events)[0].aboveGinaThreshold, true);
+});
+
+test('worstWeeks does not flag weeks at or below GINA threshold', () => {
+  const monday = Temporal.Now.plainDateISO().subtract({ days: Temporal.Now.plainDateISO().dayOfWeek - 1 }).toString();
+  const events = [{ date: monday, count: 2, preventive: false }];
+  assert.equal(worstWeeks(events)[0].aboveGinaThreshold, false);
+});
+
+test('worstWeeks sorts by rescue doses descending', () => {
+  const today = Temporal.Now.plainDateISO();
+  const thisMonday = today.subtract({ days: today.dayOfWeek - 1 }).toString();
+  const lastMonday = today.subtract({ days: today.dayOfWeek - 1 + 7 }).toString();
+  const events = [
+    { date: thisMonday, count: 1, preventive: false },
+    { date: lastMonday, count: 4, preventive: false },
+  ];
+  const result = worstWeeks(events);
+  assert.equal(result[0].weekStart, lastMonday);
+  assert.equal(result[0].rescueDoses, 4);
+});
+
+test('worstWeeks returns at most n results', () => {
+  const today = Temporal.Now.plainDateISO();
+  const events = [];
+  for (let w = 0; w < 5; w++) {
+    const monday = today.subtract({ days: today.dayOfWeek - 1 + w * 7 }).toString();
+    events.push({ date: monday, count: w + 1, preventive: false });
+  }
+  assert.equal(worstWeeks(events, 3).length, 3);
+});
+
+test('worstWeeks ignores events older than 26 weeks', () => {
+  const oldDate = Temporal.Now.plainDateISO().subtract({ weeks: 27 }).toString();
+  const events = [{ date: oldDate, count: 10, preventive: false }];
+  assert.deepEqual(worstWeeks(events), []);
 });

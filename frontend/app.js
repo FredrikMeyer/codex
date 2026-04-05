@@ -1,5 +1,6 @@
 import { lastTypeKey } from './config.js';
 import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescueSummary } from './tracker.js';
+import { buildReportHtml } from './report.js';
 import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries } from './storage.js';
 import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, renderWeeklySummary } from './ui.js';
 import { initAsthmaEditDialog, openAsthmaEditDialog, initRitalinEditDialog, openRitalinEditDialog } from './editDialog.js';
@@ -13,6 +14,7 @@ const decBtn = document.getElementById('decrement');
 const saveBtn = document.getElementById('save');
 const resetBtn = document.getElementById('reset-day');
 const exportBtn = document.getElementById('export');
+const doctorReportBtn = document.getElementById('doctor-report');
 const medicineTypeButtons = document.querySelectorAll('.medicine-type:not(.edit-asthma-type)');
 const preventiveBtn = document.getElementById('preventive-toggle');
 
@@ -139,6 +141,12 @@ exportBtn.addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
   toast('CSV exported');
+});
+
+doctorReportBtn.addEventListener('click', () => {
+  const win = window.open('', '_blank');
+  win.document.write(buildReportHtml(entries));
+  win.document.close();
 });
 
 // --- Tab navigation ---

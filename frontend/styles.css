@@ -214,6 +214,16 @@ button:disabled {
   cursor: pointer;
 }
 
+.ghost-medical {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+  color: #10b981 !important;
+}
+
+.ghost-medical:hover {
+  background: rgba(16, 185, 129, 0.08) !important;
+  border-color: #10b981 !important;
+}
+
 .entries {
   display: grid;
   gap: 10px;
