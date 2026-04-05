@@ -16,6 +16,7 @@ from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from .migrate import migrate_json_to_sqlite
 from .repository import CodeRepository, LogRepository
 from .sqlite_storage import SqliteStorage
 
@@ -153,6 +154,10 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
     # Create SQLite storage if configured (dual-write alongside JSON)
     resolved_db_file = db_file or os.environ.get("DB_FILE")
     sqlite = SqliteStorage(resolved_db_file) if resolved_db_file else None
+
+    # Migrate historical JSON data into SQLite before serving any requests
+    if sqlite:
+        migrate_json_to_sqlite(app.config["DATA_FILE"], sqlite)
 
     # Create repositories for data access
     code_repository = CodeRepository(app.config["DATA_FILE"], sqlite=sqlite)
