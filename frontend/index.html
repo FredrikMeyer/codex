@@ -13,6 +13,17 @@
   <title>Asthma Medicine Tracker</title>
 </head>
 <body>
+  <div id="js-error" style="display:none;background:#dc2626;color:#fff;padding:10px 16px;position:fixed;top:0;left:0;right:0;z-index:9999;font-size:13px;word-break:break-all;"></div>
+  <script>
+    window.addEventListener('error', function(e) {
+      var el = document.getElementById('js-error');
+      if (el) { el.textContent = 'JS error: ' + e.message + ' (' + (e.filename||'').split('/').pop() + ':' + e.lineno + ')'; el.style.display = 'block'; }
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      var el = document.getElementById('js-error');
+      if (el) { el.textContent = 'Error: ' + ((e.reason && e.reason.message) || e.reason || 'unknown'); el.style.display = 'block'; }
+    });
+  </script>
   <header>
     <div class="header-title">Asthma Medicine Tracker</div>
   </header>
@@ -75,7 +86,7 @@
         <div id="sync-setup" class="sync-setup">
           <div class="setup-step">
             <p class="hint">Option 1: Generate a new code</p>
-            <button id="generate-code" class="ghost">Generate Code</button>
+            <button id="generate-code" class="ghost" type="button">Generate Code</button>
             <div id="generated-code" class="code-display"></div>
           </div>
 
@@ -83,7 +94,15 @@
             <p class="hint">Option 2: Enter an existing code (6 characters)</p>
             <div class="code-input-group">
               <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
-              <button id="complete-setup" class="primary">Complete Setup</button>
+              <button id="complete-setup" class="primary" type="button">Complete Setup</button>
+            </div>
+          </div>
+
+          <div class="setup-step">
+            <p class="hint">Option 3: Paste token from existing device</p>
+            <div class="code-input-group">
+              <input type="text" id="token-input" placeholder="Paste token...">
+              <button id="enter-token" class="primary" type="button">Use Token</button>
             </div>
           </div>
         </div>

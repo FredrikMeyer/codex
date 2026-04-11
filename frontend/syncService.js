@@ -14,6 +14,8 @@ const codeInput = document.getElementById('code-input');
 const completeSetupBtn = document.getElementById('complete-setup');
 const disconnectBtn = document.getElementById('disconnect-sync');
 const clearLocalDataBtn = document.getElementById('clear-local-data');
+const tokenInput = document.getElementById('token-input');
+const enterTokenBtn = document.getElementById('enter-token');
 const showCodeBtn = document.getElementById('show-code');
 const syncFromCloudBtn = document.getElementById('sync-from-cloud');
 const syncToCloudBtn = document.getElementById('sync-to-cloud');
@@ -304,6 +306,17 @@ export function initSyncService({ getEntries, setEntries, getRitalinEntries, set
 
   generateCodeBtn.addEventListener('click', generateCode);
   completeSetupBtn.addEventListener('click', completeSetup);
+  enterTokenBtn.addEventListener('click', () => {
+    const token = tokenInput.value.trim();
+    if (!token) {
+      toast('Please paste a token');
+      return;
+    }
+    setToken(token);
+    tokenInput.value = '';
+    updateSyncStatus();
+    toast('Cloud sync connected!');
+  });
   disconnectBtn.addEventListener('click', disconnectSync);
   clearLocalDataBtn.addEventListener('click', clearLocalData);
   showCodeBtn.addEventListener('click', showCode);

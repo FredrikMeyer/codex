@@ -18,7 +18,9 @@ const doctorReportBtn = document.getElementById('doctor-report');
 const medicineTypeButtons = document.querySelectorAll('.medicine-type:not(.edit-asthma-type)');
 const preventiveBtn = document.getElementById('preventive-toggle');
 
-usageDate.value = Temporal.Now.plainDateISO().toString();
+usageDate.value = typeof Temporal !== 'undefined'
+  ? Temporal.Now.plainDateISO().toString()
+  : new Date().toISOString().slice(0, 10);
 
 let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
 let preventive = false;
@@ -189,7 +191,9 @@ const ritalinSaveBtn = document.getElementById('ritalin-save');
 const ritalinResetBtn = document.getElementById('ritalin-reset-day');
 const ritalinExportBtn = document.getElementById('ritalin-export');
 
-ritalinDateEl.value = Temporal.Now.plainDateISO().toString();
+ritalinDateEl.value = typeof Temporal !== 'undefined'
+  ? Temporal.Now.plainDateISO().toString()
+  : new Date().toISOString().slice(0, 10);
 
 let ritalinEntries = loadRitalinEntries();
 
