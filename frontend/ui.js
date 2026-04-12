@@ -1,15 +1,22 @@
 import { sumForType } from './tracker.js';
 import { buildAsthmaChartSvg, buildRitalinChartSvg } from './charts.js';
 
+/** @param {string} message @returns {void} */
 export function toast(message) {
-  const toastEl = document.getElementById('toast');
+  const toastEl = /** @type {HTMLElement} */ (document.getElementById('toast'));
   toastEl.textContent = message;
   toastEl.classList.add('show');
   setTimeout(() => toastEl.classList.remove('show'), 1800);
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @param {(date: string) => void} onDeleteDate
+ * @param {((event: UsageEvent) => void) | null} onEditEntry
+ * @returns {void}
+ */
 export function renderAsthmaHistory(events, onDeleteDate, onEditEntry) {
-  const entriesEl = document.getElementById('entries');
+  const entriesEl = /** @type {HTMLElement} */ (document.getElementById('entries'));
   entriesEl.innerHTML = '';
   const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => Temporal.PlainDate.compare(b, a));
   if (!dates.length) {
@@ -56,14 +63,21 @@ export function renderAsthmaHistory(events, onDeleteDate, onEditEntry) {
   }
 }
 
+/** @param {UsageEvent[]} events @returns {void} */
 export function renderAsthmaChart(events) {
-  const chartEl = document.getElementById('chart');
+  const chartEl = /** @type {HTMLElement} */ (document.getElementById('chart'));
   const svg = buildAsthmaChartSvg(events);
   chartEl.innerHTML = svg ?? '<div class="hint">No data yet.</div>';
 }
 
+/**
+ * @param {RitalinEvent[]} events
+ * @param {(date: string) => void} onDeleteDate
+ * @param {((event: RitalinEvent) => void) | null} onEditEntry
+ * @returns {void}
+ */
 export function renderRitalinHistory(events, onDeleteDate, onEditEntry) {
-  const entriesEl = document.getElementById('ritalin-entries');
+  const entriesEl = /** @type {HTMLElement} */ (document.getElementById('ritalin-entries'));
   entriesEl.innerHTML = '';
   const dates = [...new Set(events.map((e) => e.date))].sort((a, b) => Temporal.PlainDate.compare(b, a));
   if (!dates.length) {
@@ -106,36 +120,58 @@ export function renderRitalinHistory(events, onDeleteDate, onEditEntry) {
   }
 }
 
+/** @param {RitalinEvent[]} events @returns {void} */
 export function renderRitalinChart(events) {
-  const chartEl = document.getElementById('ritalin-chart');
+  const chartEl = /** @type {HTMLElement} */ (document.getElementById('ritalin-chart'));
   const svg = buildRitalinChartSvg(events);
   chartEl.innerHTML = svg ?? '<div class="hint">No data yet.</div>';
 }
 
+/**
+ * @typedef {Object} SyncElements
+ * @property {HTMLElement | null} syncStatusText
+ * @property {Element | null} syncStatusDot
+ * @property {HTMLElement | null} syncSetupSection
+ * @property {HTMLElement | null} syncConfiguredSection
+ * @property {HTMLElement | null} syncFromCloudBtn
+ * @property {HTMLElement | null} syncToCloudBtn
+ * @property {HTMLElement | null} ritalinSyncFromCloudBtn
+ * @property {HTMLElement | null} ritalinSyncToCloudBtn
+ */
+
+/**
+ * @param {boolean} isConfigured
+ * @param {SyncElements} elements
+ * @returns {void}
+ */
 export function updateSyncStatus(isConfigured, elements) {
   const { syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
           syncFromCloudBtn, syncToCloudBtn, ritalinSyncFromCloudBtn, ritalinSyncToCloudBtn } = elements;
   if (isConfigured) {
-    syncStatusText.textContent = 'Connected';
-    syncStatusDot.classList.add('connected');
-    syncSetupSection.style.display = 'none';
-    syncConfiguredSection.style.display = 'block';
-    syncFromCloudBtn.style.display = 'block';
-    syncToCloudBtn.style.display = 'block';
-    ritalinSyncFromCloudBtn.style.display = 'block';
-    ritalinSyncToCloudBtn.style.display = 'block';
+    if (syncStatusText) syncStatusText.textContent = 'Connected';
+    if (syncStatusDot) syncStatusDot.classList.add('connected');
+    if (syncSetupSection) syncSetupSection.style.display = 'none';
+    if (syncConfiguredSection) syncConfiguredSection.style.display = 'block';
+    if (syncFromCloudBtn) syncFromCloudBtn.style.display = 'block';
+    if (syncToCloudBtn) syncToCloudBtn.style.display = 'block';
+    if (ritalinSyncFromCloudBtn) ritalinSyncFromCloudBtn.style.display = 'block';
+    if (ritalinSyncToCloudBtn) ritalinSyncToCloudBtn.style.display = 'block';
   } else {
-    syncStatusText.textContent = 'Not configured';
-    syncStatusDot.classList.remove('connected');
-    syncSetupSection.style.display = 'block';
-    syncConfiguredSection.style.display = 'none';
-    syncFromCloudBtn.style.display = 'none';
-    syncToCloudBtn.style.display = 'none';
-    ritalinSyncFromCloudBtn.style.display = 'none';
-    ritalinSyncToCloudBtn.style.display = 'none';
+    if (syncStatusText) syncStatusText.textContent = 'Not configured';
+    if (syncStatusDot) syncStatusDot.classList.remove('connected');
+    if (syncSetupSection) syncSetupSection.style.display = 'block';
+    if (syncConfiguredSection) syncConfiguredSection.style.display = 'none';
+    if (syncFromCloudBtn) syncFromCloudBtn.style.display = 'none';
+    if (syncToCloudBtn) syncToCloudBtn.style.display = 'none';
+    if (ritalinSyncFromCloudBtn) ritalinSyncFromCloudBtn.style.display = 'none';
+    if (ritalinSyncToCloudBtn) ritalinSyncToCloudBtn.style.display = 'none';
   }
 }
 
+/**
+ * @param {WeeklySummary} stats
+ * @returns {string}
+ */
 export function buildWeeklySummaryHtml(stats) {
   const { thisWeek, lastWeek, delta } = stats;
   if (thisWeek === 0 && lastWeek === 0) {
@@ -151,6 +187,10 @@ export function buildWeeklySummaryHtml(stats) {
   `;
 }
 
+/**
+ * @param {WeeklySummary} stats
+ * @returns {void}
+ */
 export function renderWeeklySummary(stats) {
   const el = document.getElementById('weekly-summary');
   if (!el) return;

@@ -45,6 +45,20 @@ echo -e "${BLUE}║     Codex Test Suite              ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════╝${NC}"
 echo ""
 
+echo -e "${YELLOW}🔍 Running JS type checking with tsc${NC}"
+echo ""
+(cd frontend && node_modules/.bin/tsc)
+TSC_EXIT_CODE=$?
+if [ $TSC_EXIT_CODE -eq 0 ]; then
+    echo ""
+    echo -e "${GREEN}✓ JS type checking passed!${NC}"
+else
+    echo ""
+    echo -e "${RED}✗ JS type checking failed${NC}"
+    exit $TSC_EXIT_CODE
+fi
+echo ""
+
 echo -e "${YELLOW}🧪 Running JS unit tests${NC}"
 echo ""
 deno test --allow-read frontend/test/*.test.js

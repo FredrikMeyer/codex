@@ -1,6 +1,10 @@
 import { aggregateByMonth, worstWeeks } from './tracker.js';
 import { buildAsthmaChartSvg } from './charts.js';
 
+/**
+ * @param {UsageEvent[]} entries
+ * @returns {string}
+ */
 export function buildReportHtml(entries) {
   const monthly = aggregateByMonth(entries, 6);
   const worst = worstWeeks(entries, 5);

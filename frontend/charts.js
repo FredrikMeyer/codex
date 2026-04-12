@@ -1,5 +1,9 @@
 import { aggregateByDate, aggregateRitalinByDate } from './tracker.js';
 
+/**
+ * @param {UsageEvent[]} events
+ * @returns {string | null}
+ */
 export function buildAsthmaChartSvg(events) {
   const data = aggregateByDate(events);
 
@@ -19,7 +23,9 @@ export function buildAsthmaChartSvg(events) {
   const maxDoses = Math.max(...data.map((d) => d.preventive + d.rescue));
   const barGroupWidth = chartWidth / data.length;
   const barWidth = Math.min(barGroupWidth * 0.6, 24);
+  /** @param {number} value @returns {number} */
   const barH = (value) => (value / maxDoses) * chartHeight;
+  /** @param {number} value @returns {number} */
   const barY = (value) => PAD_TOP + chartHeight - barH(value);
   const labelStep = Math.max(1, Math.ceil(data.length / 8));
 
@@ -45,6 +51,10 @@ export function buildAsthmaChartSvg(events) {
   return `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">${gridLine}${elements.join('')}</svg>`;
 }
 
+/**
+ * @param {RitalinEvent[]} events
+ * @returns {string | null}
+ */
 export function buildRitalinChartSvg(events) {
   const data = aggregateRitalinByDate(events);
 
@@ -64,7 +74,9 @@ export function buildRitalinChartSvg(events) {
   const maxDoses = Math.max(...data.map((d) => d.count));
   const barGroupWidth = chartWidth / data.length;
   const barWidth = Math.min(barGroupWidth * 0.6, 24);
+  /** @param {number} value @returns {number} */
   const barH = (value) => (value / maxDoses) * chartHeight;
+  /** @param {number} value @returns {number} */
   const barY = (value) => PAD_TOP + chartHeight - barH(value);
   const labelStep = Math.max(1, Math.ceil(data.length / 8));
 

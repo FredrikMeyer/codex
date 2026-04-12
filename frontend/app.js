@@ -7,25 +7,27 @@ import { initAsthmaEditDialog, openAsthmaEditDialog, initRitalinEditDialog, open
 import { initSyncService, deleteEventsFromCloud, deleteRitalinEventsFromCloud } from './syncService.js';
 
 // DOM elements
-const usageDate = document.getElementById('usage-date');
-const countEl = document.getElementById('count');
-const incBtn = document.getElementById('increment');
-const decBtn = document.getElementById('decrement');
-const saveBtn = document.getElementById('save');
-const resetBtn = document.getElementById('reset-day');
-const exportBtn = document.getElementById('export');
-const doctorReportBtn = document.getElementById('doctor-report');
-const medicineTypeButtons = document.querySelectorAll('.medicine-type:not(.edit-asthma-type)');
-const preventiveBtn = document.getElementById('preventive-toggle');
+const usageDate = /** @type {HTMLInputElement} */ (document.getElementById('usage-date'));
+const countEl = /** @type {HTMLElement} */ (document.getElementById('count'));
+const incBtn = /** @type {HTMLButtonElement} */ (document.getElementById('increment'));
+const decBtn = /** @type {HTMLButtonElement} */ (document.getElementById('decrement'));
+const saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('save'));
+const resetBtn = /** @type {HTMLButtonElement} */ (document.getElementById('reset-day'));
+const exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById('export'));
+const doctorReportBtn = /** @type {HTMLButtonElement} */ (document.getElementById('doctor-report'));
+const medicineTypeButtons = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('.medicine-type:not(.edit-asthma-type)'));
+const preventiveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('preventive-toggle'));
 
 usageDate.value = typeof Temporal !== 'undefined'
   ? Temporal.Now.plainDateISO().toString()
   : new Date().toISOString().slice(0, 10);
 
-let selectedMedicineType = localStorage.getItem(lastTypeKey) || 'ventoline';
+/** @type {MedicineType} */
+let selectedMedicineType = /** @type {MedicineType} */ (localStorage.getItem(lastTypeKey) || 'ventoline');
 let preventive = false;
 
 
+/** @param {UsageEvent[]} events @returns {void} */
 function renderAll(events) {
   renderWeeklySummary(weeklyRescueSummary(events));
   renderAsthmaHistory(events, (date) => {
@@ -39,19 +41,23 @@ function renderAll(events) {
   renderAsthmaChart(events);
 }
 
+/** @param {string} value @returns {string} */
 function formatDate(value) {
   return Temporal.PlainDate.from(value).toString();
 }
 
+/** @param {number} value @returns {void} */
 function updateCount(value) {
-  countEl.textContent = value;
+  countEl.textContent = String(value);
 }
 
+/** @returns {void} */
 function updateCountForCurrentSelection() {
   const dateKey = formatDate(usageDate.value);
   updateCount(sumForType(entries, dateKey, selectedMedicineType));
 }
 
+/** @returns {void} */
 function resetPreventive() {
   preventive = false;
   preventiveBtn.classList.remove('active');
@@ -67,7 +73,7 @@ if (!localStorage.getItem(migrationKey)) {
 
 // Set active medicine type button based on stored preference
 medicineTypeButtons.forEach((btn) => {
-  if (btn.dataset.type === selectedMedicineType) {
+  if (btn.dataset['type'] === selectedMedicineType) {
     btn.classList.add('active');
   } else {
     btn.classList.remove('active');
@@ -80,7 +86,7 @@ medicineTypeButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     medicineTypeButtons.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
-    selectedMedicineType = btn.dataset.type;
+    selectedMedicineType = /** @type {MedicineType} */ (btn.dataset['type'] || 'ventoline');
     resetPreventive();
     updateCountForCurrentSelection();
   });
@@ -147,6 +153,7 @@ exportBtn.addEventListener('click', () => {
 
 doctorReportBtn.addEventListener('click', () => {
   const win = window.open('', '_blank');
+  if (!win) return;
   win.document.write(buildReportHtml(entries));
   win.document.close();
 });
@@ -165,11 +172,12 @@ tabButtons.forEach((btn) => {
 
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
-    const panel = document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`);
+    const panel = document.querySelector(`.tab-panel[data-panel="${/** @type {HTMLElement} */ (btn).dataset['tab']}"]`);
     if (panel) panel.removeAttribute('hidden');
   });
 });
 
+/** @param {RitalinEvent[]} events @returns {void} */
 function renderRitalinAll(events) {
   renderRitalinHistory(events, (date) => {
     const removedIds = ritalinEntries.filter((e) => e.date === date).map((e) => e.id);
@@ -183,13 +191,13 @@ function renderRitalinAll(events) {
 }
 
 // --- Ritalin DOM elements ---
-const ritalinDateEl = document.getElementById('ritalin-date');
-const ritalinCountEl = document.getElementById('ritalin-count');
-const ritalinIncBtn = document.getElementById('ritalin-increment');
-const ritalinDecBtn = document.getElementById('ritalin-decrement');
-const ritalinSaveBtn = document.getElementById('ritalin-save');
-const ritalinResetBtn = document.getElementById('ritalin-reset-day');
-const ritalinExportBtn = document.getElementById('ritalin-export');
+const ritalinDateEl = /** @type {HTMLInputElement} */ (document.getElementById('ritalin-date'));
+const ritalinCountEl = /** @type {HTMLElement} */ (document.getElementById('ritalin-count'));
+const ritalinIncBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-increment'));
+const ritalinDecBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-decrement'));
+const ritalinSaveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-save'));
+const ritalinResetBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-reset-day'));
+const ritalinExportBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-export'));
 
 ritalinDateEl.value = typeof Temporal !== 'undefined'
   ? Temporal.Now.plainDateISO().toString()
@@ -197,22 +205,23 @@ ritalinDateEl.value = typeof Temporal !== 'undefined'
 
 let ritalinEntries = loadRitalinEntries();
 
+/** @returns {void} */
 function updateRitalinCountForDate() {
   const date = formatDate(ritalinDateEl.value);
   const total = ritalinEntries
     .filter((e) => e.date === date)
     .reduce((sum, e) => sum + e.count, 0);
-  ritalinCountEl.textContent = total;
+  ritalinCountEl.textContent = String(total);
 }
 
 ritalinDateEl.addEventListener('change', updateRitalinCountForDate);
 
 ritalinIncBtn.addEventListener('click', () => {
-  ritalinCountEl.textContent = (Number(ritalinCountEl.textContent) || 0) + 1;
+  ritalinCountEl.textContent = String((Number(ritalinCountEl.textContent) || 0) + 1);
 });
 
 ritalinDecBtn.addEventListener('click', () => {
-  ritalinCountEl.textContent = Math.max(0, (Number(ritalinCountEl.textContent) || 0) - 1);
+  ritalinCountEl.textContent = String(Math.max(0, (Number(ritalinCountEl.textContent) || 0) - 1));
 });
 
 ritalinSaveBtn.addEventListener('click', () => {
@@ -222,7 +231,7 @@ ritalinSaveBtn.addEventListener('click', () => {
     ritalinEntries.push({ id: generateId(), date: dateKey, timestamp: createTimestamp(dateKey), count: newCount });
   }
   saveRitalinEntries(ritalinEntries);
-  ritalinCountEl.textContent = 0;
+  ritalinCountEl.textContent = '0';
   renderRitalinAll(ritalinEntries);
   toast('Saved');
 });
@@ -230,7 +239,7 @@ ritalinSaveBtn.addEventListener('click', () => {
 ritalinResetBtn.addEventListener('click', () => {
   const dateKey = formatDate(ritalinDateEl.value);
   ritalinEntries = ritalinEntries.filter((e) => e.date !== dateKey);
-  ritalinCountEl.textContent = 0;
+  ritalinCountEl.textContent = '0';
   saveRitalinEntries(ritalinEntries);
   renderRitalinAll(ritalinEntries);
   toast('Reset for day');

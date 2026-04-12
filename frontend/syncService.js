@@ -8,28 +8,36 @@ const syncStatusText = document.getElementById('sync-status-text');
 const syncStatusDot = document.querySelector('.status-dot');
 const syncSetupSection = document.getElementById('sync-setup');
 const syncConfiguredSection = document.getElementById('sync-configured');
-const generateCodeBtn = document.getElementById('generate-code');
-const generatedCodeDisplay = document.getElementById('generated-code');
-const codeInput = document.getElementById('code-input');
-const completeSetupBtn = document.getElementById('complete-setup');
-const disconnectBtn = document.getElementById('disconnect-sync');
-const clearLocalDataBtn = document.getElementById('clear-local-data');
-const tokenInput = document.getElementById('token-input');
-const enterTokenBtn = document.getElementById('enter-token');
-const showCodeBtn = document.getElementById('show-code');
-const syncFromCloudBtn = document.getElementById('sync-from-cloud');
-const syncToCloudBtn = document.getElementById('sync-to-cloud');
-const ritalinSyncFromCloudBtn = document.getElementById('ritalin-sync-from-cloud');
-const ritalinSyncToCloudBtn = document.getElementById('ritalin-sync-to-cloud');
+const generateCodeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('generate-code'));
+const generatedCodeDisplay = /** @type {HTMLElement} */ (document.getElementById('generated-code'));
+const codeInput = /** @type {HTMLInputElement} */ (document.getElementById('code-input'));
+const completeSetupBtn = /** @type {HTMLButtonElement} */ (document.getElementById('complete-setup'));
+const disconnectBtn = /** @type {HTMLButtonElement} */ (document.getElementById('disconnect-sync'));
+const clearLocalDataBtn = /** @type {HTMLButtonElement} */ (document.getElementById('clear-local-data'));
+const tokenInput = /** @type {HTMLInputElement} */ (document.getElementById('token-input'));
+const enterTokenBtn = /** @type {HTMLButtonElement} */ (document.getElementById('enter-token'));
+const showCodeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('show-code'));
+const syncFromCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-from-cloud'));
+const syncToCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-to-cloud'));
+const ritalinSyncFromCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-sync-from-cloud'));
+const ritalinSyncToCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-sync-to-cloud'));
 
+/** @type {(() => UsageEvent[]) | undefined} */
 let _getEntries;
+/** @type {((entries: UsageEvent[]) => void) | undefined} */
 let _setEntries;
+/** @type {(() => RitalinEvent[]) | undefined} */
 let _getRitalinEntries;
+/** @type {((entries: RitalinEvent[]) => void) | undefined} */
 let _setRitalinEntries;
+/** @type {((entries: UsageEvent[]) => void) | undefined} */
 let _onSynced;
+/** @type {((entries: RitalinEvent[]) => void) | undefined} */
 let _onRitalinSynced;
+/** @type {(() => void) | undefined} */
 let _onLocalDataCleared;
 
+/** @returns {void} */
 function updateSyncStatus() {
   renderSyncStatus(hasToken(), {
     syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
@@ -37,6 +45,7 @@ function updateSyncStatus() {
   });
 }
 
+/** @returns {Promise<void>} */
 async function generateCode() {
   try {
     generateCodeBtn.disabled = true;
@@ -55,6 +64,7 @@ async function generateCode() {
   }
 }
 
+/** @returns {Promise<void>} */
 async function completeSetup() {
   const code = codeInput.value.trim().toUpperCase();
   if (!code) {
@@ -81,7 +91,7 @@ async function completeSetup() {
     updateSyncStatus();
     toast('Cloud sync connected!');
   } catch (error) {
-    toast(error.message || 'Failed to connect. Please try again.');
+    toast(/** @type {Error} */ (error).message || 'Failed to connect. Please try again.');
     console.error('Complete setup error:', error);
   } finally {
     completeSetupBtn.disabled = false;
@@ -89,15 +99,17 @@ async function completeSetup() {
   }
 }
 
+/** @returns {void} */
 function clearLocalData() {
   if (confirm('Clear all local data on this device? Your cloud data is unaffected. You can sync it back afterwards.')) {
-    _setEntries([]);
+    if (_setEntries) _setEntries([]);
     saveEntries([]);
-    _onLocalDataCleared();
+    if (_onLocalDataCleared) _onLocalDataCleared();
     toast('Local data cleared');
   }
 }
 
+/** @returns {void} */
 function disconnectSync() {
   if (confirm('Are you sure you want to disconnect cloud sync? Your local data will remain safe.')) {
     clearToken();
@@ -106,6 +118,7 @@ function disconnectSync() {
   }
 }
 
+/** @returns {Promise<void>} */
 async function showCode() {
   const token = getToken();
   if (!token) {
@@ -128,7 +141,7 @@ async function showCode() {
       toast(`Your code: ${code}`);
     }
   } catch (error) {
-    if (error.status === 401) {
+    if (/** @type {any} */ (error).status === 401) {
       toast('Session expired. Please reconnect.');
       clearToken();
       updateSyncStatus();
@@ -139,6 +152,7 @@ async function showCode() {
   }
 }
 
+/** @returns {Promise<void>} */
 async function syncToCloud() {
   const token = getToken();
   if (!token) {
@@ -146,7 +160,7 @@ async function syncToCloud() {
     return;
   }
 
-  const entries = _getEntries();
+  const entries = _getEntries ? _getEntries() : [];
   if (entries.length === 0) {
     toast('No entries to sync');
     return;
@@ -174,6 +188,7 @@ async function syncToCloud() {
   }
 }
 
+/** @returns {Promise<void>} */
 async function syncFromCloud() {
   const token = getToken();
   if (!token) {
@@ -193,16 +208,16 @@ async function syncFromCloud() {
       return;
     }
 
-    const { entries: merged, newCount, idUpdates } = smartMerge(_getEntries(), cloudEvents);
+    const { entries: merged, newCount, idUpdates } = smartMerge(_getEntries ? _getEntries() : [], cloudEvents);
 
     if (newCount === 0 && idUpdates === 0) {
       toast('Already in sync');
       return;
     }
 
-    _setEntries(merged);
+    if (_setEntries) _setEntries(merged);
     saveEntries(merged);
-    _onSynced(merged);
+    if (_onSynced) _onSynced(merged);
 
     if (newCount > 0) {
       toast(`✓ Synced ${newCount} new ${newCount === 1 ? 'event' : 'events'} from cloud`);
@@ -210,7 +225,7 @@ async function syncFromCloud() {
       toast('Already in sync');
     }
   } catch (error) {
-    toast(error.message || 'Sync failed. Check your connection.');
+    toast(/** @type {Error} */ (error).message || 'Sync failed. Check your connection.');
     console.error('Sync from cloud error:', error);
   } finally {
     syncFromCloudBtn.disabled = false;
@@ -218,10 +233,11 @@ async function syncFromCloud() {
   }
 }
 
+/** @returns {Promise<void>} */
 async function syncRitalinToCloud() {
   const token = getToken();
   if (!token) { toast('Please set up cloud sync first'); return; }
-  const ritalinEntries = _getRitalinEntries();
+  const ritalinEntries = _getRitalinEntries ? _getRitalinEntries() : [];
   if (ritalinEntries.length === 0) { toast('No entries to sync'); return; }
 
   try {
@@ -243,6 +259,7 @@ async function syncRitalinToCloud() {
   }
 }
 
+/** @returns {Promise<void>} */
 async function syncRitalinFromCloud() {
   const token = getToken();
   if (!token) { toast('Please set up cloud sync first'); return; }
@@ -256,25 +273,29 @@ async function syncRitalinFromCloud() {
 
     if (cloudEvents.length === 0) { toast('No data on cloud yet'); return; }
 
-    const ritalinEntries = _getRitalinEntries();
+    const ritalinEntries = _getRitalinEntries ? _getRitalinEntries() : [];
     const localIds = new Set(ritalinEntries.map((e) => e.id));
     const newEvents = cloudEvents.filter((e) => !localIds.has(e.id));
 
     if (newEvents.length === 0) { toast('Already in sync'); return; }
 
     const merged = [...ritalinEntries, ...newEvents];
-    _setRitalinEntries(merged);
+    if (_setRitalinEntries) _setRitalinEntries(merged);
     saveRitalinEntries(merged);
-    _onRitalinSynced(merged);
+    if (_onRitalinSynced) _onRitalinSynced(merged);
     toast(`✓ Synced ${newEvents.length} new ${newEvents.length === 1 ? 'event' : 'events'} from cloud`);
   } catch (error) {
-    toast(error.message || 'Sync failed. Check your connection.');
+    toast(/** @type {Error} */ (error).message || 'Sync failed. Check your connection.');
   } finally {
     ritalinSyncFromCloudBtn.disabled = false;
     ritalinSyncFromCloudBtn.textContent = 'Sync from Cloud';
   }
 }
 
+/**
+ * @param {string[]} ids
+ * @returns {Promise<void>}
+ */
 export async function deleteEventsFromCloud(ids) {
   const token = getToken();
   if (!token || ids.length === 0) return;
@@ -285,6 +306,10 @@ export async function deleteEventsFromCloud(ids) {
   }
 }
 
+/**
+ * @param {string[]} ids
+ * @returns {Promise<void>}
+ */
 export async function deleteRitalinEventsFromCloud(ids) {
   const token = getToken();
   if (!token || ids.length === 0) return;
@@ -295,6 +320,21 @@ export async function deleteRitalinEventsFromCloud(ids) {
   }
 }
 
+/**
+ * @typedef {Object} SyncServiceOptions
+ * @property {() => UsageEvent[]} getEntries
+ * @property {(entries: UsageEvent[]) => void} setEntries
+ * @property {() => RitalinEvent[]} getRitalinEntries
+ * @property {(entries: RitalinEvent[]) => void} setRitalinEntries
+ * @property {(entries: UsageEvent[]) => void} onSynced
+ * @property {(entries: RitalinEvent[]) => void} onRitalinSynced
+ * @property {() => void} onLocalDataCleared
+ */
+
+/**
+ * @param {SyncServiceOptions} options
+ * @returns {void}
+ */
 export function initSyncService({ getEntries, setEntries, getRitalinEntries, setRitalinEntries, onSynced, onRitalinSynced, onLocalDataCleared }) {
   _getEntries = getEntries;
   _setEntries = setEntries;
