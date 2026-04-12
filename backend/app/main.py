@@ -117,7 +117,7 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
 
     # Configure proxy support for production (behind nginx)
     if app.config["PRODUCTION"]:
-        app.wsgi_app = ProxyFix(  # type: ignore[assignment]
+        app.wsgi_app = ProxyFix(  # type: ignore
             app.wsgi_app,
             x_for=1,    # Trust X-Forwarded-For (real client IP)
             x_proto=1,  # Trust X-Forwarded-Proto (original protocol)
