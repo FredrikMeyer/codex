@@ -2,22 +2,17 @@
 
 ## Overview
 
-The project now has automated testing configured with:
-- **GitHub Actions CI** for backend tests
+The project has automated testing configured with:
+- **GitHub Actions CI** for all tests
+- **Deno** for JS unit tests (`frontend/test/*.test.js`)
+- **ty** for Python type checking
 - **Pytest** for unit and integration tests
 - **E2E tests** using requests (HTTP API testing)
-- **Playwright** ready for browser-based E2E tests (future)
+- **Playwright** for browser-based frontend E2E tests
 
 ## Current Test Coverage
 
-```
-Name              Stmts   Miss  Cover
--------------------------------------
-app/__init__.py       2      0   100%
-app/main.py          73      2    97%
--------------------------------------
-TOTAL                75      2    97%
-```
+Run `./test.sh` to see the latest coverage report. Coverage is tracked for `app/` and `backend/tests/`.
 
 ## Test Structure
 
@@ -88,11 +83,10 @@ uv run pytest-watch
 **Example flow:**
 1. Generate code → 2. Login with code → 3. Save log entry
 
-### Browser Tests (`test_playwright_example.py` - future)
-- Currently skipped
-- Ready for frontend E2E testing
-- Would test actual browser interactions
-- Requires Playwright browsers installed
+### Frontend E2E Tests (`test_frontend_e2e.py`)
+- Tests actual browser interactions via Playwright
+- Covers core UI flows: loading, counter, save, delete, reset
+- Run with `./test.sh --frontend`
 
 ## Adding New Tests
 
@@ -131,9 +125,8 @@ Add `.pre-commit-config.yaml` to run tests before each commit.
 - Prevent coverage drops
 
 ### Frontend testing
-- Add Vitest or Jest for JavaScript unit tests
-- Add Playwright tests for UI flows
-- Create separate frontend CI workflow
+- JS unit tests: `deno test --allow-read frontend/test/*.test.js` (21 tests in `tracker.test.js`)
+- Playwright E2E tests: `./test.sh --frontend`
 
 ## Troubleshooting
 

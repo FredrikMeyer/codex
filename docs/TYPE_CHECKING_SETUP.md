@@ -62,57 +62,9 @@ uv run ty check app tests
 uv run ty check
 ```
 
-## Current Type Issues Found
+## Type Issues
 
-`ty` found **11 diagnostics** in the codebase:
-
-### Warnings (4 - Deprecated API)
-**Issue**: Using deprecated `datetime.utcnow()`
-**Files**: `app/main.py` (lines 135, 150, 185, 255)
-
-```python
-# Current (deprecated)
-datetime.utcnow().isoformat() + "Z"
-
-# Should be
-datetime.now(datetime.UTC).isoformat()
-```
-
-**Impact**: Low - works but deprecated in Python 3.12+
-**Fix**: Replace with timezone-aware datetime
-
-### Errors (5 - Playwright Type Issues)
-**Issue**: `text_content()` returns `str | None`, not `str`
-**Files**: `tests/test_frontend_e2e.py` (lines 157, 158, 203, 204, 205)
-
-```python
-# Current (type error)
-entry_text = entries.first.locator(".count").text_content()
-assert "2 doses" in entry_text  # entry_text could be None
-
-# Should be
-entry_text = entries.first.locator(".count").text_content()
-assert entry_text is not None
-assert "2 doses" in entry_text
-```
-
-**Impact**: Low - tests pass, but type-unsafe
-**Fix**: Add None check before assertions
-
-### Errors (2 - pytest.skip Type Issues)
-**Issue**: Incorrect usage of `pytest.skip()` with positional arguments
-**File**: `tests/test_playwright_example.py` (line 11)
-
-```python
-# Current (type error)
-pytest.skip("Browser tests not yet implemented", allow_module_level=True)
-
-# Should be (keyword argument)
-pytest.skip(reason="Browser tests not yet implemented", allow_module_level=True)
-```
-
-**Impact**: Low - works but type-incorrect
-**Fix**: Use keyword argument for `reason`
+All type issues found during initial setup have been resolved. The codebase is type-clean. Running `./test.sh` (or `./test.sh --typecheck`) will surface any new issues.
 
 ## Benefits
 
@@ -137,24 +89,7 @@ pytest.skip(reason="Browser tests not yet implemented", allow_module_level=True)
 - **Zero config** - works out of the box
 - **From Astral** - makers of uv and ruff
 
-## Next Steps
-
-### Optional: Fix Type Issues
-The type issues found are low priority (all tests pass), but fixing them improves type safety:
-
-1. **Replace `datetime.utcnow()`** (4 warnings)
-   - Replace with `datetime.now(datetime.UTC)`
-   - Simple find/replace
-
-2. **Add None checks in Playwright tests** (5 errors)
-   - Add `assert entry_text is not None` before string checks
-   - More type-safe
-
-3. **Fix pytest.skip usage** (2 errors)
-   - Use keyword argument `reason=` instead of positional
-   - Better API usage
-
-### Optional: Stricter Type Checking
+## Optional: Stricter Type Checking
 Create `pyproject.toml` configuration to enable stricter checks:
 ```toml
 [tool.ty]
@@ -162,12 +97,9 @@ Create `pyproject.toml` configuration to enable stricter checks:
 strict = true
 ```
 
-## Checkpoint ✅
+## Status
 
 - ✅ ty installed and working
-- ✅ Type checking integrated into test.sh
-- ✅ Type checking runs in CI before tests
-- ✅ Documentation updated
-- ✅ 11 type issues identified (non-blocking)
-
-**Type checking infrastructure complete and enforced in CI!**
+- ✅ Type checking integrated into test.sh (runs before tests)
+- ✅ Type checking enforced in CI
+- ✅ All type issues resolved
