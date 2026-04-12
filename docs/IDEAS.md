@@ -10,7 +10,7 @@ The most clinically meaningful insight missing. GINA guidelines say >2 rescue us
 **Trigger tracking**
 When logging a rescue dose, optionally tag the trigger: exercise, cold air, pollen, stress, illness, dust. Over time patterns emerge ("you use ventoline 3x more on high-pollen days"). Could be free-text or a preset list.
 
-**Doctor report export**
+**Doctor report export** ✅ Done
 A formatted PDF or printable HTML summary for GP appointments: total doses by month, rescue vs preventive ratio, worst weeks, any visible trends. Takes raw data and makes it medically actionable.
 
 **Symptom severity on rescue doses**
@@ -70,7 +70,7 @@ Background Sync API — queue events while offline, flush automatically when con
 **`localStorage` → `IndexedDB`**
 localStorage is synchronous, size-limited (~5MB), and blocked in some private browsing modes. For a health app, IndexedDB is more reliable. The abstraction in `storage.js` makes this migration feasible without touching `app.js`.
 
-**Backend: JSON file → SQLite**
+**Backend: JSON file → SQLite** ✅ Done (Steps 1–6 complete; Step 8 cleanup remaining)
 The JSON file storage works but is fragile — a crash mid-write corrupts the file. SQLite is just as zero-dependency, but transactional.
 
 **Error handling in async ops**

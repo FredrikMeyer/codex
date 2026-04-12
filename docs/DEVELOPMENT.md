@@ -18,7 +18,7 @@ Press `Ctrl+C` to stop both services.
 
 ## What the dev script does
 
-1. Starts Flask backend on port 5000 with debug mode
+1. Starts Flask backend on port 5001 with debug mode
 2. Starts Python HTTP server for frontend on port 8000
 3. Waits for backend to be ready (health check)
 4. Shows you both URLs
@@ -66,10 +66,10 @@ Run the complete test suite:
 ```
 
 This runs:
-- Type checking with Pyright
-- Backend unit tests
+- JS unit tests (Deno)
+- Type checking with ty
+- Backend unit tests with coverage
 - Frontend E2E tests with Playwright
-- Coverage report
 
 ## Configuration
 
@@ -77,9 +77,9 @@ This runs:
 
 The frontend automatically detects localhost and uses `http://localhost:5001` as the backend URL.
 
-For production, the backend URL is configured in `frontend/app.js`:
+The backend URL is configured in `frontend/config.js`:
 ```javascript
-const backendUrl = window.backendUrl || (window.location.hostname === 'localhost'
+export const backendUrl = window.backendUrl || (window.location.hostname === 'localhost'
   ? 'http://localhost:5001'
   : 'https://asthma.fredrikmeyer.net');
 ```

@@ -68,7 +68,7 @@ After running tests with coverage:
 
 ### Before commit
 ```bash
-./test.sh --fast  # Quick validation
+./test.sh  # Full validation including ty type checking (required before commit)
 ```
 
 ### Debugging a failing test
