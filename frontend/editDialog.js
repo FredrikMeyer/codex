@@ -3,23 +3,34 @@ import { saveEntries, saveRitalinEntries } from './storage.js';
 import { toast } from './ui.js';
 
 // --- Asthma edit dialog ---
-const asthmaEditDialog = document.getElementById('asthma-edit-dialog');
-const editAsthmaDateEl = document.getElementById('edit-asthma-date');
-const editAsthmaTimeEl = document.getElementById('edit-asthma-time');
-const editAsthmaCountEl = document.getElementById('edit-asthma-count');
-const editAsthmaPreventiveBtn = document.getElementById('edit-asthma-preventive');
-const editAsthmaTypeButtons = document.querySelectorAll('.edit-asthma-type');
-const editAsthmaSaveBtn = document.getElementById('edit-asthma-save');
-const editAsthmaCancelBtn = document.getElementById('edit-asthma-cancel');
+const asthmaEditDialog = /** @type {HTMLDialogElement} */ (document.getElementById('asthma-edit-dialog'));
+const editAsthmaDateEl = /** @type {HTMLInputElement} */ (document.getElementById('edit-asthma-date'));
+const editAsthmaTimeEl = /** @type {HTMLInputElement} */ (document.getElementById('edit-asthma-time'));
+const editAsthmaCountEl = /** @type {HTMLInputElement} */ (document.getElementById('edit-asthma-count'));
+const editAsthmaPreventiveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('edit-asthma-preventive'));
+const editAsthmaTypeButtons = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('.edit-asthma-type'));
+const editAsthmaSaveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('edit-asthma-save'));
+const editAsthmaCancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('edit-asthma-cancel'));
 
+/** @type {UsageEvent | null} */
 let editingAsthmaEntry = null;
 let editingAsthmaPreventive = false;
+/** @type {MedicineType} */
 let editingAsthmaType = 'ventoline';
 
+/** @type {(() => UsageEvent[]) | undefined} */
 let _getAsthmaEntries;
+/** @type {((entries: UsageEvent[]) => void) | undefined} */
 let _setAsthmaEntries;
+/** @type {((entries: UsageEvent[]) => void) | undefined} */
 let _onAsthmaSaved;
 
+/**
+ * @param {() => UsageEvent[]} getEntries
+ * @param {(entries: UsageEvent[]) => void} setEntries
+ * @param {(entries: UsageEvent[]) => void} onSaved
+ * @returns {void}
+ */
 export function initAsthmaEditDialog(getEntries, setEntries, onSaved) {
   _getAsthmaEntries = getEntries;
   _setAsthmaEntries = setEntries;
@@ -27,7 +38,7 @@ export function initAsthmaEditDialog(getEntries, setEntries, onSaved) {
 
   editAsthmaTypeButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      editingAsthmaType = btn.dataset.type;
+      editingAsthmaType = /** @type {MedicineType} */ (btn.dataset['type'] || 'ventoline');
       editAsthmaTypeButtons.forEach((b) => b.classList.toggle('active', b === btn));
     });
   });
@@ -38,9 +49,11 @@ export function initAsthmaEditDialog(getEntries, setEntries, onSaved) {
   });
 
   editAsthmaSaveBtn.addEventListener('click', () => {
+    if (!editingAsthmaEntry || !_getAsthmaEntries || !_setAsthmaEntries || !_onAsthmaSaved) return;
     const newDate = editAsthmaDateEl.value;
     const newTime = editAsthmaTimeEl.value || '12:00';
     const newCount = Number(editAsthmaCountEl.value) || 1;
+    /** @type {UsageEvent} */
     const updated = {
       ...editingAsthmaEntry,
       date: newDate,
@@ -63,6 +76,10 @@ export function initAsthmaEditDialog(getEntries, setEntries, onSaved) {
   editAsthmaCancelBtn.addEventListener('click', () => asthmaEditDialog.close());
 }
 
+/**
+ * @param {UsageEvent} entry
+ * @returns {void}
+ */
 export function openAsthmaEditDialog(entry) {
   editingAsthmaEntry = entry;
   editingAsthmaPreventive = entry.preventive;
@@ -72,35 +89,47 @@ export function openAsthmaEditDialog(entry) {
     .toPlainTime();
   editAsthmaDateEl.value = entry.date;
   editAsthmaTimeEl.value = localTime.toString().slice(0, 5);
-  editAsthmaCountEl.value = entry.count;
-  editAsthmaTypeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.type === editingAsthmaType));
+  editAsthmaCountEl.value = String(entry.count);
+  editAsthmaTypeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset['type'] === editingAsthmaType));
   editAsthmaPreventiveBtn.classList.toggle('active', editingAsthmaPreventive);
   asthmaEditDialog.showModal();
 }
 
 // --- Ritalin edit dialog ---
-const ritalinEditDialog = document.getElementById('ritalin-edit-dialog');
-const editRitalinDateEl = document.getElementById('edit-ritalin-date');
-const editRitalinTimeEl = document.getElementById('edit-ritalin-time');
-const editRitalinCountEl = document.getElementById('edit-ritalin-count');
-const editRitalinSaveBtn = document.getElementById('edit-ritalin-save');
-const editRitalinCancelBtn = document.getElementById('edit-ritalin-cancel');
+const ritalinEditDialog = /** @type {HTMLDialogElement} */ (document.getElementById('ritalin-edit-dialog'));
+const editRitalinDateEl = /** @type {HTMLInputElement} */ (document.getElementById('edit-ritalin-date'));
+const editRitalinTimeEl = /** @type {HTMLInputElement} */ (document.getElementById('edit-ritalin-time'));
+const editRitalinCountEl = /** @type {HTMLInputElement} */ (document.getElementById('edit-ritalin-count'));
+const editRitalinSaveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('edit-ritalin-save'));
+const editRitalinCancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('edit-ritalin-cancel'));
 
+/** @type {RitalinEvent | null} */
 let editingRitalinEntry = null;
 
+/** @type {(() => RitalinEvent[]) | undefined} */
 let _getRitalinEntries;
+/** @type {((entries: RitalinEvent[]) => void) | undefined} */
 let _setRitalinEntries;
+/** @type {((entries: RitalinEvent[]) => void) | undefined} */
 let _onRitalinSaved;
 
+/**
+ * @param {() => RitalinEvent[]} getEntries
+ * @param {(entries: RitalinEvent[]) => void} setEntries
+ * @param {(entries: RitalinEvent[]) => void} onSaved
+ * @returns {void}
+ */
 export function initRitalinEditDialog(getEntries, setEntries, onSaved) {
   _getRitalinEntries = getEntries;
   _setRitalinEntries = setEntries;
   _onRitalinSaved = onSaved;
 
   editRitalinSaveBtn.addEventListener('click', () => {
+    if (!editingRitalinEntry || !_getRitalinEntries || !_setRitalinEntries || !_onRitalinSaved) return;
     const newDate = editRitalinDateEl.value;
     const newTime = editRitalinTimeEl.value || '12:00';
     const newCount = Number(editRitalinCountEl.value) || 1;
+    /** @type {RitalinEvent} */
     const updated = {
       ...editingRitalinEntry,
       date: newDate,
@@ -121,6 +150,10 @@ export function initRitalinEditDialog(getEntries, setEntries, onSaved) {
   editRitalinCancelBtn.addEventListener('click', () => ritalinEditDialog.close());
 }
 
+/**
+ * @param {RitalinEvent} entry
+ * @returns {void}
+ */
 export function openRitalinEditDialog(entry) {
   editingRitalinEntry = entry;
   const localTime = Temporal.Instant.from(entry.timestamp)
@@ -128,6 +161,6 @@ export function openRitalinEditDialog(entry) {
     .toPlainTime();
   editRitalinDateEl.value = entry.date;
   editRitalinTimeEl.value = localTime.toString().slice(0, 5);
-  editRitalinCountEl.value = entry.count;
+  editRitalinCountEl.value = String(entry.count);
   ritalinEditDialog.showModal();
 }

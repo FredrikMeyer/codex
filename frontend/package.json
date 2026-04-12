@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "typescript": "^6.0.2"
+  }
+}

@@ -1,3 +1,4 @@
+/** @returns {string} */
 export function generateId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -5,25 +6,46 @@ export function generateId() {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
+/**
+ * @param {string} dateValue
+ * @returns {string}
+ */
 export function createTimestamp(dateValue) {
   const today = Temporal.Now.plainDateISO().toString();
   return dateValue === today ? Temporal.Now.instant().toString() : dateValue + 'T12:00:00.000Z';
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @param {string} date
+ * @returns {UsageEvent[]}
+ */
 export function getEventsForDate(events, date) {
   return events.filter((e) => e.date === date);
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @param {string} date
+ * @param {MedicineType} type
+ * @returns {number}
+ */
 export function sumForType(events, date, type) {
   return getEventsForDate(events, date)
     .filter((e) => e.type === type)
     .reduce((sum, e) => sum + e.count, 0);
 }
 
+/** @param {number} daysAgo @returns {string} */
 function daysAgoISO(daysAgo) {
   return Temporal.Now.plainDateISO().subtract({ days: daysAgo }).toString();
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @param {number} [days]
+ * @returns {DailyAsthmaAggregation[]}
+ */
 export function aggregateByDate(events, days = 30) {
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -38,6 +60,11 @@ export function aggregateByDate(events, days = 30) {
   return result;
 }
 
+/**
+ * @param {RitalinEvent[]} events
+ * @param {number} [days]
+ * @returns {DailyRitalinAggregation[]}
+ */
 export function aggregateRitalinByDate(events, days = 30) {
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -50,20 +77,26 @@ export function aggregateRitalinByDate(events, days = 30) {
   return result;
 }
 
+/**
+ * @param {UsageEvent[] | Record<string, unknown>} data
+ * @param {() => string} [generateIdFn]
+ * @returns {UsageEvent[]}
+ */
 export function migrateToEventLog(data, generateIdFn = generateId) {
   if (Array.isArray(data)) {
     return data;
   }
 
-  const events = [];
+  const events = /** @type {UsageEvent[]} */ ([]);
   for (const [date, value] of Object.entries(data)) {
     let spray = 0;
     let ventoline = 0;
     if (typeof value === 'number') {
       ventoline = value;
     } else if (value && typeof value === 'object') {
-      spray = value.spray || 0;
-      ventoline = value.ventoline || 0;
+      const v = /** @type {Record<string, number>} */ (value);
+      spray = v['spray'] || 0;
+      ventoline = v['ventoline'] || 0;
     }
     if (spray > 0) {
       events.push({ id: generateIdFn(), date, timestamp: date + 'T12:00:00.000Z', type: 'spray', count: spray, preventive: false });
@@ -76,11 +109,16 @@ export function migrateToEventLog(data, generateIdFn = generateId) {
   return events;
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @returns {WeeklySummary}
+ */
 export function weeklyRescueSummary(events) {
   const today = Temporal.Now.plainDateISO();
   const thisWeekStart = today.subtract({ days: 6 });
   const lastWeekStart = today.subtract({ days: 13 });
 
+  /** @param {UsageEvent} e @returns {boolean} */
   const inThisWeek = (e) => {
     const d = Temporal.PlainDate.from(e.date);
     return !e.preventive &&
@@ -88,6 +126,7 @@ export function weeklyRescueSummary(events) {
       Temporal.PlainDate.compare(d, today) <= 0;
   };
 
+  /** @param {UsageEvent} e @returns {boolean} */
   const inLastWeek = (e) => {
     const d = Temporal.PlainDate.from(e.date);
     return !e.preventive &&
@@ -101,6 +140,11 @@ export function weeklyRescueSummary(events) {
   return { thisWeek, lastWeek, delta: thisWeek - lastWeek };
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @param {number} [months]
+ * @returns {MonthlyAggregation[]}
+ */
 export function aggregateByMonth(events, months = 6) {
   const today = Temporal.Now.plainDateISO();
   const startDate = today.subtract({ months: months - 1 }).with({ day: 1 });
@@ -125,10 +169,16 @@ export function aggregateByMonth(events, months = 6) {
   return result;
 }
 
+/**
+ * @param {UsageEvent[]} events
+ * @param {number} [n]
+ * @returns {WeekEntry[]}
+ */
 export function worstWeeks(events, n = 3) {
   const today = Temporal.Now.plainDateISO();
   const cutoff = today.subtract({ weeks: 26 });
 
+  /** @type {Map<string, number>} */
   const weekMap = new Map();
   for (const event of events) {
     if (event.preventive) continue;
@@ -149,10 +199,21 @@ export function worstWeeks(events, n = 3) {
     .slice(0, n);
 }
 
+/**
+ * @template {UsageEvent | RitalinEvent} T
+ * @param {T[]} entries
+ * @param {T} updatedEntry
+ * @returns {T[]}
+ */
 export function updateEntry(entries, updatedEntry) {
   return entries.map((e) => (e.id === updatedEntry.id ? { ...updatedEntry } : e));
 }
 
+/**
+ * @param {UsageEvent[]} localEntries
+ * @param {UsageEvent[]} cloudEntries
+ * @returns {MergeResult<UsageEvent>}
+ */
 export function smartMerge(localEntries, cloudEntries) {
   const localIds = new Set(localEntries.map((e) => e.id));
   const unmatched = cloudEntries.filter((e) => !localIds.has(e.id));

@@ -1,5 +1,6 @@
 import { backendUrl } from './config.js';
 
+/** @returns {Promise<{ code: string }>} */
 export async function apiGenerateCode() {
   const response = await fetch(`${backendUrl}/generate-code`, {
     method: 'POST',
@@ -11,6 +12,10 @@ export async function apiGenerateCode() {
   return response.json();
 }
 
+/**
+ * @param {string} code
+ * @returns {Promise<{ token: string }>}
+ */
 export async function apiGenerateToken(code) {
   const response = await fetch(`${backendUrl}/generate-token`, {
     method: 'POST',
@@ -19,11 +24,15 @@ export async function apiGenerateToken(code) {
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Invalid code');
+    throw new Error(/** @type {any} */ (errorData).error || 'Invalid code');
   }
   return response.json();
 }
 
+/**
+ * @param {string} token
+ * @returns {Promise<{ code: string }>}
+ */
 export async function apiFetchCode(token) {
   const response = await fetch(`${backendUrl}/code`, {
     method: 'GET',
@@ -38,6 +47,11 @@ export async function apiFetchCode(token) {
   return response.json();
 }
 
+/**
+ * @param {string} token
+ * @param {UsageEvent[]} events
+ * @returns {Promise<UploadResult>}
+ */
 export async function apiUploadEvents(token, events) {
   const cleanEvents = events.map(({ received_at: _received_at, ...eventData }) => eventData);
   const response = await fetch(`${backendUrl}/events/batch`, {
@@ -52,6 +66,10 @@ export async function apiUploadEvents(token, events) {
   return { successCount: saved, errorCount: 0 };
 }
 
+/**
+ * @param {string} token
+ * @returns {Promise<{ events: UsageEvent[] }>}
+ */
 export async function apiDownloadEvents(token) {
   const response = await fetch(`${backendUrl}/events`, {
     method: 'GET',
@@ -66,6 +84,11 @@ export async function apiDownloadEvents(token) {
   return response.json();
 }
 
+/**
+ * @param {string} token
+ * @param {RitalinEvent[]} events
+ * @returns {Promise<UploadResult>}
+ */
 export async function apiUploadRitalinEvents(token, events) {
   const cleanEvents = events.map(({ received_at: _received_at, ...eventData }) => eventData);
   const response = await fetch(`${backendUrl}/ritalin-events/batch`, {
@@ -80,6 +103,11 @@ export async function apiUploadRitalinEvents(token, events) {
   return { successCount: saved, errorCount: 0 };
 }
 
+/**
+ * @param {string} token
+ * @param {string[]} ids
+ * @returns {Promise<void>}
+ */
 export async function apiDeleteEvents(token, ids) {
   const response = await fetch(`${backendUrl}/events`, {
     method: 'DELETE',
@@ -91,6 +119,11 @@ export async function apiDeleteEvents(token, ids) {
   }
 }
 
+/**
+ * @param {string} token
+ * @param {string[]} ids
+ * @returns {Promise<void>}
+ */
 export async function apiDeleteRitalinEvents(token, ids) {
   const response = await fetch(`${backendUrl}/ritalin-events`, {
     method: 'DELETE',
@@ -102,6 +135,10 @@ export async function apiDeleteRitalinEvents(token, ids) {
   }
 }
 
+/**
+ * @param {string} token
+ * @returns {Promise<{ events: RitalinEvent[] }>}
+ */
 export async function apiDownloadRitalinEvents(token) {
   const response = await fetch(`${backendUrl}/ritalin-events`, {
     method: 'GET',
