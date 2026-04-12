@@ -18,31 +18,51 @@ def storage() -> Generator[SqliteStorage, None, None]:
     s.close()
 
 
-def _code_entry(**overrides: object) -> CodeEntry:
-    base: CodeEntry = {"code": "ABC123", "created_at": "2026-01-01T00:00:00Z"}
-    return {**base, **overrides}  # type: ignore[return-value]
+def _code_entry(
+    *,
+    code: str = "ABC123",
+    created_at: str = "2026-01-01T00:00:00Z",
+    token: str | None = None,
+    token_generated_at: str | None = None,
+    last_login_at: str | None = None,
+) -> CodeEntry:
+    result: CodeEntry = {"code": code, "created_at": created_at}
+    if token is not None:
+        result["token"] = token
+    if token_generated_at is not None:
+        result["token_generated_at"] = token_generated_at
+    if last_login_at is not None:
+        result["last_login_at"] = last_login_at
+    return result
 
 
-def _asthma_event(**overrides: object) -> AsthmaMedicineEventData:
-    base: AsthmaMedicineEventData = {
-        "id": "event-1",
-        "date": "2026-03-01",
-        "timestamp": "2026-03-01T10:00:00.000Z",
-        "type": "spray",
-        "count": 2,
-        "preventive": False,
+def _asthma_event(
+    *,
+    id: str = "event-1",
+    date: str = "2026-03-01",
+    timestamp: str = "2026-03-01T10:00:00.000Z",
+    type: str = "spray",
+    count: int = 2,
+    preventive: bool = False,
+) -> AsthmaMedicineEventData:
+    return {
+        "id": id,
+        "date": date,
+        "timestamp": timestamp,
+        "type": type,
+        "count": count,
+        "preventive": preventive,
     }
-    return {**base, **overrides}  # type: ignore[return-value]
 
 
-def _ritalin_event(**overrides: object) -> RitalinEventData:
-    base: RitalinEventData = {
-        "id": "ritalin-1",
-        "date": "2026-03-01",
-        "timestamp": "2026-03-01T08:00:00.000Z",
-        "count": 1,
-    }
-    return {**base, **overrides}  # type: ignore[return-value]
+def _ritalin_event(
+    *,
+    id: str = "ritalin-1",
+    date: str = "2026-03-01",
+    timestamp: str = "2026-03-01T08:00:00.000Z",
+    count: int = 1,
+) -> RitalinEventData:
+    return {"id": id, "date": date, "timestamp": timestamp, "count": count}
 
 
 # --- codes ---

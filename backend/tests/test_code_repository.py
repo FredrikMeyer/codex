@@ -79,7 +79,8 @@ def test_validate_token_returns_false_for_unknown_token(repo: CodeRepository) ->
 def test_validate_token_returns_true_for_valid_token(repo: CodeRepository) -> None:
     repo.create_code("ABC123")
     token = repo.generate_token("ABC123")
-    assert repo.validate_token(token) is True  # type: ignore[arg-type]
+    assert token is not None
+    assert repo.validate_token(token) is True
 
 
 def test_validate_token_returns_false_for_code_without_token(repo: CodeRepository) -> None:
@@ -96,11 +97,13 @@ def test_get_code_for_token_returns_none_for_unknown_token(repo: CodeRepository)
 def test_get_code_for_token_returns_correct_code(repo: CodeRepository) -> None:
     repo.create_code("ABC123")
     token = repo.generate_token("ABC123")
-    assert repo.get_code_for_token(token) == "ABC123"  # type: ignore[arg-type]
+    assert token is not None
+    assert repo.get_code_for_token(token) == "ABC123"
 
 
 def test_get_code_for_token_isolates_users(repo: CodeRepository) -> None:
     repo.create_code("CODE_A")
     repo.create_code("CODE_B")
     token_a = repo.generate_token("CODE_A")
-    assert repo.get_code_for_token(token_a) == "CODE_A"  # type: ignore[arg-type]
+    assert token_a is not None
+    assert repo.get_code_for_token(token_a) == "CODE_A"
