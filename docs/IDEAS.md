@@ -70,7 +70,7 @@ Background Sync API — queue events while offline, flush automatically when con
 **`localStorage` → `IndexedDB`**
 localStorage is synchronous, size-limited (~5MB), and blocked in some private browsing modes. For a health app, IndexedDB is more reliable. The abstraction in `storage.js` makes this migration feasible without touching `app.js`.
 
-**Backend: JSON file → SQLite** ✅ Done (Steps 1–6 complete; Step 8 cleanup remaining)
+**Backend: JSON file → SQLite** (Steps 1–6 ✅ done; Steps 7–8 remaining: verify in prod, then remove JSON dual-write)
 The JSON file storage works but is fragile — a crash mid-write corrupts the file. SQLite is just as zero-dependency, but transactional.
 
 **Error handling in async ops**
@@ -83,6 +83,6 @@ Several sync functions have minimal error reporting. A failed individual event u
 **No app version shown in UI**
 A small version string in the settings/sync area (matching the service worker cache key) helps diagnose issues with users.
 
-**JSDoc type annotations + `tsc --checkJs`**
-The codebase has good module separation but no type safety. Adding JSDoc types and running `tsc --checkJs --noEmit` (zero build step) would catch bugs like passing the wrong event shape to `smartMerge`.
+**JSDoc type annotations + `tsc --checkJs`** ✅ Done
+All modules annotated with JSDoc types; `tsc --checkJs --noEmit` runs in CI via `test.sh`.
     
