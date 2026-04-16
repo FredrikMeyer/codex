@@ -231,7 +231,12 @@ def test_batch_post_invalid_event_returns_400(auth_token):
     response = test_client.post("/events/batch", json={"events": events}, headers=headers)
 
     assert response.status_code == 400
-    assert "type" in response.get_json()["error"].lower()
+    body = response.get_json()
+    assert "type" in body["error"].lower()
+    assert body["field"] == "type"
+    assert body["index"] == 1
+    assert body["id"] == "bad"
+    assert "spray" in body["message"]
 
 
 def test_batch_post_missing_events_key_returns_400(auth_token):

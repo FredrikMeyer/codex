@@ -6,7 +6,7 @@ import string
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -74,6 +74,19 @@ class RitalinEvent(BaseEvent):
     """A Ritalin dose event."""
 
     count: int = Field(..., ge=1, description="Number of doses (at least 1)")
+
+
+def _event_validation_error_response(e: ValidationError, event: dict[str, Any], index: int) -> tuple[Any, int]:
+    first_error = e.errors()[0]
+    field = first_error["loc"][0] if first_error["loc"] else "event"
+    message = first_error["msg"]
+    return jsonify({
+        "error": f"Validation error in '{field}': {message}",
+        "field": field,
+        "message": message,
+        "index": index,
+        "id": event.get("id"),
+    }), 400
 
 
 # Storage functions moved to storage.py module
@@ -321,17 +334,18 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
         if not isinstance(events, list):
             return jsonify({"error": "'events' (array) is required"}), 400
 
-        for event in events:
+        for index, event in enumerate(events):
             if not isinstance(event, dict):
-                return jsonify({"error": "Each event must be an object"}), 400
+                return jsonify({"error": "Each event must be an object", "index": index}), 400
+            event_data = cast(dict[str, Any], event)
             try:
-                AsthmaMedicineEvent(**event)
+                AsthmaMedicineEvent(**event_data)
             except ValidationError as e:
                 first_error = e.errors()[0]
                 field = first_error["loc"][0] if first_error["loc"] else "event"
                 message = first_error["msg"]
-                logger.warning("Invalid asthma event rejected: %s (field=%s, payload=%r)", message, field, event)
-                return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
+                logger.warning("Invalid asthma event rejected: %s (field=%s, payload=%r)", message, field, event_data)
+                return _event_validation_error_response(e, event_data, index)
 
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]
@@ -452,17 +466,18 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
         if not isinstance(events, list):
             return jsonify({"error": "'events' (array) is required"}), 400
 
-        for event in events:
+        for index, event in enumerate(events):
             if not isinstance(event, dict):
-                return jsonify({"error": "Each event must be an object"}), 400
+                return jsonify({"error": "Each event must be an object", "index": index}), 400
+            event_data = cast(dict[str, Any], event)
             try:
-                RitalinEvent(**event)
+                RitalinEvent(**event_data)
             except ValidationError as e:
                 first_error = e.errors()[0]
                 field = first_error["loc"][0] if first_error["loc"] else "event"
                 message = first_error["msg"]
-                logger.warning("Invalid ritalin event rejected: %s (field=%s, payload=%r)", message, field, event)
-                return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
+                logger.warning("Invalid ritalin event rejected: %s (field=%s, payload=%r)", message, field, event_data)
+                return _event_validation_error_response(e, event_data, index)
 
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.split()[1]

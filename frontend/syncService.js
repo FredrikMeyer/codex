@@ -253,6 +253,9 @@ async function syncRitalinToCloud() {
     } else {
       toast('✗ Sync failed. Check your connection.');
     }
+  } catch (error) {
+    toast('Ritalin sync failed. Check your connection.');
+    console.error('Ritalin sync error:', error);
   } finally {
     ritalinSyncToCloudBtn.disabled = false;
     ritalinSyncToCloudBtn.textContent = 'Sync to Cloud';
@@ -302,7 +305,8 @@ export async function deleteEventsFromCloud(ids) {
   try {
     await apiDeleteEvents(token, ids);
   } catch (error) {
-    console.error('Failed to delete events from cloud:', error);
+    toast('Deleted locally, but cloud delete failed. Sync may restore this event.');
+    console.error('Failed to delete events from cloud:', { ids, error });
   }
 }
 
@@ -316,7 +320,8 @@ export async function deleteRitalinEventsFromCloud(ids) {
   try {
     await apiDeleteRitalinEvents(token, ids);
   } catch (error) {
-    console.error('Failed to delete ritalin events from cloud:', error);
+    toast('Deleted locally, but cloud delete failed. Sync may restore this event.');
+    console.error('Failed to delete ritalin events from cloud:', { ids, error });
   }
 }
 

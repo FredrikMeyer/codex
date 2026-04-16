@@ -73,8 +73,8 @@ localStorage is synchronous, size-limited (~5MB), and blocked in some private br
 **Backend: JSON file → SQLite** (Steps 1–6 ✅ done; Steps 7–8 remaining: verify in prod, then remove JSON dual-write)
 The JSON file storage works but is fragile — a crash mid-write corrupts the file. SQLite is just as zero-dependency, but transactional.
 
-**Error handling in async ops**
-Several sync functions have minimal error reporting. A failed individual event upload silently continues. Errors should surface with enough detail to diagnose (which event? what HTTP status?).
+**Error handling in async ops** ✅ Done
+Sync upload/delete failures now surface HTTP status, backend error details, event counts, and event IDs. Batch validation errors include the failing event index and ID.
 
 ---
 

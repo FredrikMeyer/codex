@@ -169,6 +169,11 @@ def test_ritalin_batch_invalid_event_returns_400(auth_token):
     response = test_client.post("/ritalin-events/batch", json={"events": events}, headers=headers)
 
     assert response.status_code == 400
+    body = response.get_json()
+    assert body["field"] == "timestamp"
+    assert body["index"] == 1
+    assert body["id"] == "bad"
+    assert "Field required" in body["message"]
 
 
 # --- DELETE /ritalin-events ---
