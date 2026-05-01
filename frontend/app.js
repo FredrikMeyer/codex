@@ -297,3 +297,14 @@ if ('serviceWorker' in navigator) {
 }
 
 renderAll(entries);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const today = typeof Temporal !== 'undefined'
+    ? Temporal.Now.plainDateISO().toString()
+    : new Date().toISOString().slice(0, 10);
+  usageDate.value = today;
+  updateCountForCurrentSelection();
+  ritalinDateEl.value = today;
+  updateRitalinCountForDate();
+});
