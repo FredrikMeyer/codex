@@ -318,6 +318,24 @@ button:disabled {
 .sync-collapse[open] > summary .sync-collapse-chevron {
   transform: rotate(90deg);
 }
+.sync-collapse--subtle > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  margin-bottom: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.sync-collapse--subtle > summary:hover {
+  background: transparent;
+  color: var(--text);
+}
 @media (min-width: 601px) {
   .sync-collapse > summary { display: none; }
 }
@@ -433,6 +451,8 @@ button.ritalin-primary {
   .actions { flex-direction: column; }
   .counter { grid-template-columns: repeat(3, 1fr); }
   .code-input-group { flex-direction: column; }
+  .sync-extras-buttons { flex-direction: column; }
+  .sync-extras-buttons > button { width: 100%; }
 }
 
 .entry-subrow {

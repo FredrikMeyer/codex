@@ -80,17 +80,17 @@
       </details>
 
       <div id="sync-configured" class="sync-configured" style="display: none;">
-        <p class="hint">Syncs both asthma and Ritalin events across your devices.</p>
         <div class="button-group sync-actions">
           <button id="sync-from-cloud" class="primary">Sync from Cloud</button>
           <button id="sync-to-cloud" class="primary">Sync to Cloud</button>
         </div>
-        <details class="sync-collapse" open>
+        <details class="sync-collapse sync-collapse--subtle" open>
           <summary class="sync-collapse-toggle">
-            <span>More options</span>
             <span class="sync-collapse-chevron" aria-hidden="true">▸</span>
+            <span>More options</span>
           </summary>
-          <div class="button-group">
+          <p class="hint">Syncs both asthma and Ritalin events across your devices.</p>
+          <div class="button-group sync-extras-buttons">
             <button id="show-code" class="ghost">Show My Code</button>
             <button id="disconnect-sync" class="ghost">Disconnect</button>
             <button id="clear-local-data" class="ghost danger">Clear local data</button>
