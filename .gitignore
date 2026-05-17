@@ -4,4 +4,5 @@ __pycache__/
 backend/data/storage.json
 backend/test_screenshots/
 backend/.env.local
+frontend/node_modules
 garmindb.log

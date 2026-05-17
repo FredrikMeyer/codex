@@ -1,4 +1,3 @@
-
 import logging
 import os
 import random
@@ -13,7 +12,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .migrate import migrate_json_to_sqlite
@@ -21,7 +20,6 @@ from .repository import CodeRepository, LogRepository
 from .sqlite_storage import SqliteStorage
 
 logger = logging.getLogger(__name__)
-
 
 
 class BaseEvent(BaseModel):
@@ -76,17 +74,21 @@ class RitalinEvent(BaseEvent):
     count: int = Field(..., ge=1, description="Number of doses (at least 1)")
 
 
-def _event_validation_error_response(e: ValidationError, event: dict[str, Any], index: int) -> tuple[Any, int]:
+def _event_validation_error_response(
+    e: ValidationError, event: dict[str, Any], index: int
+) -> tuple[Any, int]:
     first_error = e.errors()[0]
     field = first_error["loc"][0] if first_error["loc"] else "event"
     message = first_error["msg"]
-    return jsonify({
-        "error": f"Validation error in '{field}': {message}",
-        "field": field,
-        "message": message,
-        "index": index,
-        "id": event.get("id"),
-    }), 400
+    return jsonify(
+        {
+            "error": f"Validation error in '{field}': {message}",
+            "field": field,
+            "message": message,
+            "index": index,
+            "id": event.get("id"),
+        }
+    ), 400
 
 
 # Storage functions moved to storage.py module
@@ -96,7 +98,9 @@ def _generate_code() -> str:
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 
-def create_app(data_file: str | Path | None = None, db_file: str | Path | None = None) -> Flask:
+def create_app(
+    data_file: str | Path | None = None, db_file: str | Path | None = None
+) -> Flask:
     # Load environment variables from .env file if present
     load_dotenv()
 
@@ -105,7 +109,10 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
     # Configure data file path
     # Priority: parameter > DATA_FILE env > ASTHMA_DATA_FILE env > default
     app.config["DATA_FILE"] = Path(
-        data_file or os.environ.get("DATA_FILE") or os.environ.get("ASTHMA_DATA_FILE") or "backend/data/storage.json"
+        data_file
+        or os.environ.get("DATA_FILE")
+        or os.environ.get("ASTHMA_DATA_FILE")
+        or "backend/data/storage.json"
     )
 
     # Configure production mode
@@ -115,7 +122,11 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
     # Configure CORS
     allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
     # Split comma-separated origins or use single origin/wildcard
-    origins = [origin.strip() for origin in allowed_origins.split(",")] if "," in allowed_origins else allowed_origins
+    origins = (
+        [origin.strip() for origin in allowed_origins.split(",")]
+        if "," in allowed_origins
+        else allowed_origins
+    )
 
     # Store in config for testing
     app.config["ALLOWED_ORIGINS"] = allowed_origins
@@ -125,17 +136,17 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
         origins=origins,
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
-        methods=["GET", "POST", "DELETE", "OPTIONS"]
+        methods=["GET", "POST", "DELETE", "OPTIONS"],
     )
 
     # Configure proxy support for production (behind nginx)
     if app.config["PRODUCTION"]:
         app.wsgi_app = ProxyFix(  # type: ignore
             app.wsgi_app,
-            x_for=1,    # Trust X-Forwarded-For (real client IP)
+            x_for=1,  # Trust X-Forwarded-For (real client IP)
             x_proto=1,  # Trust X-Forwarded-Proto (original protocol)
-            x_host=1,   # Trust X-Forwarded-Host (original host)
-            x_prefix=1  # Trust X-Forwarded-Prefix (URL prefix)
+            x_host=1,  # Trust X-Forwarded-Host (original host)
+            x_prefix=1,  # Trust X-Forwarded-Prefix (URL prefix)
         )
 
     # Configure rate limiting
@@ -149,19 +160,18 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
     # Custom error handler for rate limit exceeded
     @app.errorhandler(429)
     def ratelimit_handler(e: Any) -> tuple[Any, int]:
-        response = jsonify({
-            "error": "Rate limit exceeded",
-            "message": str(e.description)
-        })
+        response = jsonify(
+            {"error": "Rate limit exceeded", "message": str(e.description)}
+        )
         # Add Retry-After header (in seconds)
         # Extract the window from the description if possible, default to 60 seconds
         retry_after = 60  # Default: retry after 1 minute
-        if hasattr(e, 'limit'):
+        if hasattr(e, "limit"):
             limit = e.limit
             # Parse limit like "5 per 1 hour" to get window in seconds
-            if hasattr(limit, 'per'):
+            if hasattr(limit, "per"):
                 retry_after = int(limit.per)
-        response.headers['Retry-After'] = str(retry_after)
+        response.headers["Retry-After"] = str(retry_after)
         return response, 429
 
     # Create SQLite storage if configured (dual-write alongside JSON)
@@ -181,6 +191,7 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
 
     def require_auth() -> Callable:
         """Decorator to require token authentication."""
+
         def decorator(f: Callable) -> Callable:
             @wraps(f)
             def decorated_function(*args: Any, **kwargs: Any) -> Any:
@@ -193,7 +204,9 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
 
                 parts = auth_header.strip().split()
                 if len(parts) != 2 or parts[0] != "Bearer":
-                    return jsonify({"error": "Invalid authorization format. Use: Bearer <token>"}), 401
+                    return jsonify(
+                        {"error": "Invalid authorization format. Use: Bearer <token>"}
+                    ), 401
 
                 token = parts[1]
 
@@ -207,6 +220,7 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
                 return f(*args, **kwargs)
 
             return decorated_function
+
         return decorator
 
     @app.post("/generate-code")
@@ -300,7 +314,12 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
             first_error = e.errors()[0]
             field = first_error["loc"][0] if first_error["loc"] else "event"
             message = first_error["msg"]
-            logger.warning("Invalid asthma event rejected: %s (field=%s, payload=%r)", message, field, event)
+            logger.warning(
+                "Invalid asthma event rejected: %s (field=%s, payload=%r)",
+                message,
+                field,
+                event,
+            )
             return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
 
         auth_header = request.headers.get("Authorization", "")
@@ -336,7 +355,9 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
 
         for index, event in enumerate(events):
             if not isinstance(event, dict):
-                return jsonify({"error": "Each event must be an object", "index": index}), 400
+                return jsonify(
+                    {"error": "Each event must be an object", "index": index}
+                ), 400
             event_data = cast(dict[str, Any], event)
             try:
                 AsthmaMedicineEvent(**event_data)
@@ -344,7 +365,12 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
                 first_error = e.errors()[0]
                 field = first_error["loc"][0] if first_error["loc"] else "event"
                 message = first_error["msg"]
-                logger.warning("Invalid asthma event rejected: %s (field=%s, payload=%r)", message, field, event_data)
+                logger.warning(
+                    "Invalid asthma event rejected: %s (field=%s, payload=%r)",
+                    message,
+                    field,
+                    event_data,
+                )
                 return _event_validation_error_response(e, event_data, index)
 
         auth_header = request.headers.get("Authorization", "")
@@ -432,7 +458,12 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
             first_error = e.errors()[0]
             field = first_error["loc"][0] if first_error["loc"] else "event"
             message = first_error["msg"]
-            logger.warning("Invalid ritalin event rejected: %s (field=%s, payload=%r)", message, field, event)
+            logger.warning(
+                "Invalid ritalin event rejected: %s (field=%s, payload=%r)",
+                message,
+                field,
+                event,
+            )
             return jsonify({"error": f"Validation error in '{field}': {message}"}), 400
 
         auth_header = request.headers.get("Authorization", "")
@@ -468,7 +499,9 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
 
         for index, event in enumerate(events):
             if not isinstance(event, dict):
-                return jsonify({"error": "Each event must be an object", "index": index}), 400
+                return jsonify(
+                    {"error": "Each event must be an object", "index": index}
+                ), 400
             event_data = cast(dict[str, Any], event)
             try:
                 RitalinEvent(**event_data)
@@ -476,7 +509,12 @@ def create_app(data_file: str | Path | None = None, db_file: str | Path | None =
                 first_error = e.errors()[0]
                 field = first_error["loc"][0] if first_error["loc"] else "event"
                 message = first_error["msg"]
-                logger.warning("Invalid ritalin event rejected: %s (field=%s, payload=%r)", message, field, event_data)
+                logger.warning(
+                    "Invalid ritalin event rejected: %s (field=%s, payload=%r)",
+                    message,
+                    field,
+                    event_data,
+                )
                 return _event_validation_error_response(e, event_data, index)
 
         auth_header = request.headers.get("Authorization", "")
