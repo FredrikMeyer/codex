@@ -1,4 +1,4 @@
-const CACHE = 'asthma-tracker-v29';
+const CACHE = 'asthma-tracker-v30';
 const ASSET_PATHS = [
   '.',
   'index.html',

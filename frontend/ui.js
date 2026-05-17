@@ -145,10 +145,12 @@ export function renderRitalinChart(events) {
 export function updateSyncStatus(isConfigured, elements) {
   const { syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
           syncFromCloudBtn, syncToCloudBtn } = elements;
+  const setupCollapse = syncSetupSection ? syncSetupSection.closest('details') : null;
   if (isConfigured) {
     if (syncStatusText) syncStatusText.textContent = 'Connected';
     if (syncStatusDot) syncStatusDot.classList.add('connected');
     if (syncSetupSection) syncSetupSection.style.display = 'none';
+    if (setupCollapse) setupCollapse.style.display = 'none';
     if (syncConfiguredSection) syncConfiguredSection.style.display = 'block';
     if (syncFromCloudBtn) syncFromCloudBtn.style.display = 'block';
     if (syncToCloudBtn) syncToCloudBtn.style.display = 'block';
@@ -156,6 +158,7 @@ export function updateSyncStatus(isConfigured, elements) {
     if (syncStatusText) syncStatusText.textContent = 'Not configured';
     if (syncStatusDot) syncStatusDot.classList.remove('connected');
     if (syncSetupSection) syncSetupSection.style.display = 'block';
+    if (setupCollapse) setupCollapse.style.display = '';
     if (syncConfiguredSection) syncConfiguredSection.style.display = 'none';
     if (syncFromCloudBtn) syncFromCloudBtn.style.display = 'none';
     if (syncToCloudBtn) syncToCloudBtn.style.display = 'none';

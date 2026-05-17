@@ -356,6 +356,17 @@ When refactoring low-cohesion logic (scattered, duplicated), consider two approa
 - **Always update the cache key** when making frontend changes to ensure users receive the latest assets
 - **JS unit tests run with Deno**: `deno test --allow-read frontend/test/*.test.js` — Deno is used because it ships the Temporal API natively. The test files use `node:test` and `node:assert` which Deno supports via its Node.js compatibility layer.
 
+### Visual verification (mandatory)
+Any visual change must be verified with Playwright screenshots **in every relevant UI state**, not just the one you happen to be looking at. Unit tests verify code correctness; they do not verify the feature works.
+
+Before claiming a visual change is done:
+1. Enumerate the relevant states (e.g. mobile vs desktop, logged-in vs logged-out, configured vs not-configured, empty vs populated, loading/error/success).
+2. Capture a screenshot of **each** state with Playwright. Use the backend venv: `cd backend && .venv/bin/python3` and serve the frontend with `cd frontend && python3 -m http.server 8765`.
+3. Open the screenshots and confirm the change looks right and nothing regressed in the states you weren't actively changing.
+4. If you can only check one state, say so explicitly instead of claiming success.
+
+Past mistake (2026-05-17): collapsed the sync setup behind a `<details>` and only screenshotted the not-configured state. The configured state still rendered a stray "Set up sync ▸" toggle above the sync buttons. Always cover **all** states the changed element can be in.
+
 ## Code Exploration with ast-grep
 Use `sg` (ast-grep) for structural code search. Unlike text-based grep, it understands syntax and can match code patterns across a codebase.
 
