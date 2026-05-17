@@ -19,6 +19,13 @@ const enterTokenBtn = /** @type {HTMLButtonElement} */ (document.getElementById(
 const showCodeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('show-code'));
 const syncFromCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-from-cloud'));
 const syncToCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-to-cloud'));
+const syncSetupCollapse = /** @type {HTMLDetailsElement | null} */ (document.querySelector('.sync-setup-collapse'));
+if (syncSetupCollapse) {
+  const mobile = window.matchMedia('(max-width: 600px)');
+  const applyCollapse = () => { syncSetupCollapse.open = !mobile.matches; };
+  applyCollapse();
+  mobile.addEventListener('change', applyCollapse);
+}
 
 /** @type {(() => UsageEvent[]) | undefined} */
 let _getEntries;

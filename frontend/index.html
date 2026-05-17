@@ -49,29 +49,35 @@
         </div>
       </div>
 
-      <div id="sync-setup" class="sync-setup">
-        <div class="setup-step">
-          <p class="hint">Option 1: Generate a new code</p>
-          <button id="generate-code" class="ghost" type="button">Generate Code</button>
-          <div id="generated-code" class="code-display"></div>
-        </div>
+      <details class="sync-setup-collapse" open>
+        <summary class="sync-setup-toggle">
+          <span>Set up sync</span>
+          <span class="sync-setup-chevron" aria-hidden="true">▸</span>
+        </summary>
+        <div id="sync-setup" class="sync-setup">
+          <div class="setup-step">
+            <p class="hint">Option 1: Generate a new code</p>
+            <button id="generate-code" class="ghost" type="button">Generate Code</button>
+            <div id="generated-code" class="code-display"></div>
+          </div>
 
-        <div class="setup-step">
-          <p class="hint">Option 2: Enter an existing code (6 characters)</p>
-          <div class="code-input-group">
-            <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
-            <button id="complete-setup" class="primary" type="button">Complete Setup</button>
+          <div class="setup-step">
+            <p class="hint">Option 2: Enter an existing code (6 characters)</p>
+            <div class="code-input-group">
+              <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
+              <button id="complete-setup" class="primary" type="button">Complete Setup</button>
+            </div>
+          </div>
+
+          <div class="setup-step">
+            <p class="hint">Option 3: Paste token from existing device</p>
+            <div class="code-input-group">
+              <input type="text" id="token-input" placeholder="Paste token...">
+              <button id="enter-token" class="primary" type="button">Use Token</button>
+            </div>
           </div>
         </div>
-
-        <div class="setup-step">
-          <p class="hint">Option 3: Paste token from existing device</p>
-          <div class="code-input-group">
-            <input type="text" id="token-input" placeholder="Paste token...">
-            <button id="enter-token" class="primary" type="button">Use Token</button>
-          </div>
-        </div>
-      </div>
+      </details>
 
       <div id="sync-configured" class="sync-configured" style="display: none;">
         <p class="hint">Syncs both asthma and Ritalin events across your devices.</p>

@@ -292,6 +292,36 @@ button:disabled {
   background: #10b981;
 }
 
+.sync-setup-collapse {
+  margin-bottom: 4px;
+}
+.sync-setup-collapse > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.sync-setup-collapse > summary::-webkit-details-marker { display: none; }
+.sync-setup-collapse > summary:hover { background: rgba(255,255,255,0.06); }
+.sync-setup-chevron {
+  transition: transform 0.2s ease;
+  color: var(--muted);
+}
+.sync-setup-collapse[open] > summary .sync-setup-chevron {
+  transform: rotate(90deg);
+}
+@media (min-width: 601px) {
+  .sync-setup-collapse > summary { display: none; }
+}
+
 .sync-setup {
   display: grid;
   gap: 16px;
