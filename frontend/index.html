@@ -49,10 +49,10 @@
         </div>
       </div>
 
-      <details class="sync-setup-collapse" open>
-        <summary class="sync-setup-toggle">
+      <details class="sync-collapse" open>
+        <summary class="sync-collapse-toggle">
           <span>Set up sync</span>
-          <span class="sync-setup-chevron" aria-hidden="true">▸</span>
+          <span class="sync-collapse-chevron" aria-hidden="true">▸</span>
         </summary>
         <div id="sync-setup" class="sync-setup">
           <div class="setup-step">
@@ -85,11 +85,17 @@
           <button id="sync-from-cloud" class="primary">Sync from Cloud</button>
           <button id="sync-to-cloud" class="primary">Sync to Cloud</button>
         </div>
-        <div class="button-group">
-          <button id="show-code" class="ghost">Show My Code</button>
-          <button id="disconnect-sync" class="ghost">Disconnect</button>
-          <button id="clear-local-data" class="ghost danger">Clear local data</button>
-        </div>
+        <details class="sync-collapse" open>
+          <summary class="sync-collapse-toggle">
+            <span>More options</span>
+            <span class="sync-collapse-chevron" aria-hidden="true">▸</span>
+          </summary>
+          <div class="button-group">
+            <button id="show-code" class="ghost">Show My Code</button>
+            <button id="disconnect-sync" class="ghost">Disconnect</button>
+            <button id="clear-local-data" class="ghost danger">Clear local data</button>
+          </div>
+        </details>
       </div>
     </section>
 
