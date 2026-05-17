@@ -204,6 +204,9 @@ button:disabled {
   display: flex;
   gap: 8px;
 }
+.button-group.sync-actions {
+  margin-bottom: 12px;
+}
 
 #export {
   padding: 10px 14px;

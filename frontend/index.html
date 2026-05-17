@@ -34,6 +34,59 @@
       <button class="tab" data-tab="ritalin" role="tab" aria-selected="false">Ritalin</button>
     </nav>
 
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <div class="label">Cloud Sync</div>
+          <div class="subtitle">Optional backup to secure cloud storage.</div>
+        </div>
+      </div>
+
+      <div id="sync-status" class="sync-status">
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          <span id="sync-status-text">Not configured</span>
+        </div>
+      </div>
+
+      <div id="sync-setup" class="sync-setup">
+        <div class="setup-step">
+          <p class="hint">Option 1: Generate a new code</p>
+          <button id="generate-code" class="ghost" type="button">Generate Code</button>
+          <div id="generated-code" class="code-display"></div>
+        </div>
+
+        <div class="setup-step">
+          <p class="hint">Option 2: Enter an existing code (6 characters)</p>
+          <div class="code-input-group">
+            <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
+            <button id="complete-setup" class="primary" type="button">Complete Setup</button>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <p class="hint">Option 3: Paste token from existing device</p>
+          <div class="code-input-group">
+            <input type="text" id="token-input" placeholder="Paste token...">
+            <button id="enter-token" class="primary" type="button">Use Token</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="sync-configured" class="sync-configured" style="display: none;">
+        <p class="hint">Syncs both asthma and Ritalin events across your devices.</p>
+        <div class="button-group sync-actions">
+          <button id="sync-from-cloud" class="primary">Sync from Cloud</button>
+          <button id="sync-to-cloud" class="primary">Sync to Cloud</button>
+        </div>
+        <div class="button-group">
+          <button id="show-code" class="ghost">Show My Code</button>
+          <button id="disconnect-sync" class="ghost">Disconnect</button>
+          <button id="clear-local-data" class="ghost danger">Clear local data</button>
+        </div>
+      </div>
+    </section>
+
     <div class="tab-panel" data-panel="asthma">
       <section class="card">
         <div class="field-row">
@@ -68,55 +121,6 @@
         </div>
       </section>
 
-      <section class="card">
-        <div class="section-heading">
-          <div>
-            <div class="label">Cloud Sync</div>
-            <div class="subtitle">Optional backup to secure cloud storage.</div>
-          </div>
-        </div>
-
-        <div id="sync-status" class="sync-status">
-          <div class="status-indicator">
-            <div class="status-dot"></div>
-            <span id="sync-status-text">Not configured</span>
-          </div>
-        </div>
-
-        <div id="sync-setup" class="sync-setup">
-          <div class="setup-step">
-            <p class="hint">Option 1: Generate a new code</p>
-            <button id="generate-code" class="ghost" type="button">Generate Code</button>
-            <div id="generated-code" class="code-display"></div>
-          </div>
-
-          <div class="setup-step">
-            <p class="hint">Option 2: Enter an existing code (6 characters)</p>
-            <div class="code-input-group">
-              <input type="text" id="code-input" placeholder="ABC123" maxlength="6">
-              <button id="complete-setup" class="primary" type="button">Complete Setup</button>
-            </div>
-          </div>
-
-          <div class="setup-step">
-            <p class="hint">Option 3: Paste token from existing device</p>
-            <div class="code-input-group">
-              <input type="text" id="token-input" placeholder="Paste token...">
-              <button id="enter-token" class="primary" type="button">Use Token</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="sync-configured" class="sync-configured" style="display: none;">
-          <p class="hint">Your device is connected to cloud storage.</p>
-          <div class="button-group">
-            <button id="show-code" class="ghost">Show My Code</button>
-            <button id="disconnect-sync" class="ghost">Disconnect</button>
-            <button id="clear-local-data" class="ghost danger">Clear local data</button>
-          </div>
-        </div>
-      </section>
-
       <section class="card" id="trends-card">
         <div class="label">Trends</div>
         <div class="subtitle">Last 30 days of usage.</div>
@@ -131,8 +135,6 @@
             <div class="subtitle">Stored on this device for offline access.</div>
           </div>
           <div class="button-group">
-            <button id="sync-from-cloud" class="primary" style="display: none;">Sync from Cloud</button>
-            <button id="sync-to-cloud" class="primary" style="display: none;">Sync to Cloud</button>
             <button id="export" class="ghost">Export CSV</button>
             <button id="doctor-report" class="ghost ghost-medical">Doctor report</button>
           </div>
@@ -179,8 +181,6 @@
             <div class="subtitle">Stored on this device for offline access.</div>
           </div>
           <div class="button-group">
-            <button id="ritalin-sync-from-cloud" class="primary ritalin-primary" style="display: none;">Sync from Cloud</button>
-            <button id="ritalin-sync-to-cloud" class="primary ritalin-primary" style="display: none;">Sync to Cloud</button>
             <button id="ritalin-export" class="ghost">Export CSV</button>
           </div>
         </div>

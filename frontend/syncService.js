@@ -19,8 +19,6 @@ const enterTokenBtn = /** @type {HTMLButtonElement} */ (document.getElementById(
 const showCodeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('show-code'));
 const syncFromCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-from-cloud'));
 const syncToCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-to-cloud'));
-const ritalinSyncFromCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-sync-from-cloud'));
-const ritalinSyncToCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ritalin-sync-to-cloud'));
 
 /** @type {(() => UsageEvent[]) | undefined} */
 let _getEntries;
@@ -41,7 +39,7 @@ let _onLocalDataCleared;
 function updateSyncStatus() {
   renderSyncStatus(hasToken(), {
     syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
-    syncFromCloudBtn, syncToCloudBtn, ritalinSyncFromCloudBtn, ritalinSyncToCloudBtn
+    syncFromCloudBtn, syncToCloudBtn
   });
 }
 
@@ -152,6 +150,19 @@ async function showCode() {
   }
 }
 
+/**
+ * @param {number} asthma
+ * @param {number} ritalin
+ * @returns {string}
+ */
+function describeCombinedCount(asthma, ritalin) {
+  const parts = [];
+  if (asthma > 0) parts.push(`${asthma} asthma`);
+  if (ritalin > 0) parts.push(`${ritalin} ritalin`);
+  const noun = (asthma + ritalin) === 1 ? 'event' : 'events';
+  return `${parts.join(' + ')} ${noun}`;
+}
+
 /** @returns {Promise<void>} */
 async function syncToCloud() {
   const token = getToken();
@@ -160,8 +171,10 @@ async function syncToCloud() {
     return;
   }
 
-  const entries = _getEntries ? _getEntries() : [];
-  if (entries.length === 0) {
+  const asthmaEntries = _getEntries ? _getEntries() : [];
+  const ritalinEntries = _getRitalinEntries ? _getRitalinEntries() : [];
+
+  if (asthmaEntries.length === 0 && ritalinEntries.length === 0) {
     toast('No entries to sync');
     return;
   }
@@ -170,12 +183,22 @@ async function syncToCloud() {
     syncToCloudBtn.disabled = true;
     syncToCloudBtn.textContent = 'Syncing...';
 
-    const { successCount, errorCount } = await apiUploadEvents(token, entries);
+    const asthmaUpload = asthmaEntries.length > 0
+      ? apiUploadEvents(token, asthmaEntries)
+      : Promise.resolve({ successCount: 0, errorCount: 0 });
+    const ritalinUpload = ritalinEntries.length > 0
+      ? apiUploadRitalinEvents(token, ritalinEntries)
+      : Promise.resolve({ successCount: 0, errorCount: 0 });
 
-    if (errorCount === 0) {
-      toast(`✓ Synced ${successCount} ${successCount === 1 ? 'event' : 'events'} to cloud`);
-    } else if (successCount > 0) {
-      toast(`⚠ Synced ${successCount} events, ${errorCount} failed`);
+    const [asthmaResult, ritalinResult] = await Promise.all([asthmaUpload, ritalinUpload]);
+
+    const totalErrors = asthmaResult.errorCount + ritalinResult.errorCount;
+    const totalSuccess = asthmaResult.successCount + ritalinResult.successCount;
+
+    if (totalErrors === 0) {
+      toast(`✓ Synced ${describeCombinedCount(asthmaResult.successCount, ritalinResult.successCount)} to cloud`);
+    } else if (totalSuccess > 0) {
+      toast(`⚠ Synced ${totalSuccess} events, ${totalErrors} failed`);
     } else {
       toast('✗ Sync failed. Check your connection.');
     }
@@ -200,29 +223,36 @@ async function syncFromCloud() {
     syncFromCloudBtn.disabled = true;
     syncFromCloudBtn.textContent = 'Syncing...';
 
-    const data = await apiDownloadEvents(token);
-    const cloudEvents = data.events;
+    const [asthmaData, ritalinData] = await Promise.all([
+      apiDownloadEvents(token),
+      apiDownloadRitalinEvents(token)
+    ]);
 
-    if (cloudEvents.length === 0) {
-      toast('No data on cloud yet');
-      return;
+    const localAsthma = _getEntries ? _getEntries() : [];
+    const { entries: mergedAsthma, newCount: newAsthmaCount, idUpdates } =
+      smartMerge(localAsthma, asthmaData.events);
+
+    if (newAsthmaCount > 0 || idUpdates > 0) {
+      if (_setEntries) _setEntries(mergedAsthma);
+      saveEntries(mergedAsthma);
+      if (_onSynced) _onSynced(mergedAsthma);
     }
 
-    const { entries: merged, newCount, idUpdates } = smartMerge(_getEntries ? _getEntries() : [], cloudEvents);
+    const localRitalin = _getRitalinEntries ? _getRitalinEntries() : [];
+    const localRitalinIds = new Set(localRitalin.map((e) => e.id));
+    const newRitalinEvents = ritalinData.events.filter((e) => !localRitalinIds.has(e.id));
 
-    if (newCount === 0 && idUpdates === 0) {
+    if (newRitalinEvents.length > 0) {
+      const mergedRitalin = [...localRitalin, ...newRitalinEvents];
+      if (_setRitalinEntries) _setRitalinEntries(mergedRitalin);
+      saveRitalinEntries(mergedRitalin);
+      if (_onRitalinSynced) _onRitalinSynced(mergedRitalin);
+    }
+
+    if (newAsthmaCount === 0 && newRitalinEvents.length === 0) {
       toast('Already in sync');
-      return;
-    }
-
-    if (_setEntries) _setEntries(merged);
-    saveEntries(merged);
-    if (_onSynced) _onSynced(merged);
-
-    if (newCount > 0) {
-      toast(`✓ Synced ${newCount} new ${newCount === 1 ? 'event' : 'events'} from cloud`);
     } else {
-      toast('Already in sync');
+      toast(`✓ Synced ${describeCombinedCount(newAsthmaCount, newRitalinEvents.length)} from cloud`);
     }
   } catch (error) {
     toast(/** @type {Error} */ (error).message || 'Sync failed. Check your connection.');
@@ -230,68 +260,6 @@ async function syncFromCloud() {
   } finally {
     syncFromCloudBtn.disabled = false;
     syncFromCloudBtn.textContent = 'Sync from Cloud';
-  }
-}
-
-/** @returns {Promise<void>} */
-async function syncRitalinToCloud() {
-  const token = getToken();
-  if (!token) { toast('Please set up cloud sync first'); return; }
-  const ritalinEntries = _getRitalinEntries ? _getRitalinEntries() : [];
-  if (ritalinEntries.length === 0) { toast('No entries to sync'); return; }
-
-  try {
-    ritalinSyncToCloudBtn.disabled = true;
-    ritalinSyncToCloudBtn.textContent = 'Syncing...';
-
-    const { successCount, errorCount } = await apiUploadRitalinEvents(token, ritalinEntries);
-
-    if (errorCount === 0) {
-      toast(`✓ Synced ${successCount} ${successCount === 1 ? 'event' : 'events'} to cloud`);
-    } else if (successCount > 0) {
-      toast(`⚠ Synced ${successCount} events, ${errorCount} failed`);
-    } else {
-      toast('✗ Sync failed. Check your connection.');
-    }
-  } catch (error) {
-    toast('Ritalin sync failed. Check your connection.');
-    console.error('Ritalin sync error:', error);
-  } finally {
-    ritalinSyncToCloudBtn.disabled = false;
-    ritalinSyncToCloudBtn.textContent = 'Sync to Cloud';
-  }
-}
-
-/** @returns {Promise<void>} */
-async function syncRitalinFromCloud() {
-  const token = getToken();
-  if (!token) { toast('Please set up cloud sync first'); return; }
-
-  try {
-    ritalinSyncFromCloudBtn.disabled = true;
-    ritalinSyncFromCloudBtn.textContent = 'Syncing...';
-
-    const data = await apiDownloadRitalinEvents(token);
-    const cloudEvents = data.events;
-
-    if (cloudEvents.length === 0) { toast('No data on cloud yet'); return; }
-
-    const ritalinEntries = _getRitalinEntries ? _getRitalinEntries() : [];
-    const localIds = new Set(ritalinEntries.map((e) => e.id));
-    const newEvents = cloudEvents.filter((e) => !localIds.has(e.id));
-
-    if (newEvents.length === 0) { toast('Already in sync'); return; }
-
-    const merged = [...ritalinEntries, ...newEvents];
-    if (_setRitalinEntries) _setRitalinEntries(merged);
-    saveRitalinEntries(merged);
-    if (_onRitalinSynced) _onRitalinSynced(merged);
-    toast(`✓ Synced ${newEvents.length} new ${newEvents.length === 1 ? 'event' : 'events'} from cloud`);
-  } catch (error) {
-    toast(/** @type {Error} */ (error).message || 'Sync failed. Check your connection.');
-  } finally {
-    ritalinSyncFromCloudBtn.disabled = false;
-    ritalinSyncFromCloudBtn.textContent = 'Sync from Cloud';
   }
 }
 
@@ -367,8 +335,6 @@ export function initSyncService({ getEntries, setEntries, getRitalinEntries, set
   showCodeBtn.addEventListener('click', showCode);
   syncFromCloudBtn.addEventListener('click', syncFromCloud);
   syncToCloudBtn.addEventListener('click', syncToCloud);
-  ritalinSyncToCloudBtn.addEventListener('click', syncRitalinToCloud);
-  ritalinSyncFromCloudBtn.addEventListener('click', syncRitalinFromCloud);
 
   codeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {

@@ -135,8 +135,6 @@ export function renderRitalinChart(events) {
  * @property {HTMLElement | null} syncConfiguredSection
  * @property {HTMLElement | null} syncFromCloudBtn
  * @property {HTMLElement | null} syncToCloudBtn
- * @property {HTMLElement | null} ritalinSyncFromCloudBtn
- * @property {HTMLElement | null} ritalinSyncToCloudBtn
  */
 
 /**
@@ -146,7 +144,7 @@ export function renderRitalinChart(events) {
  */
 export function updateSyncStatus(isConfigured, elements) {
   const { syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
-          syncFromCloudBtn, syncToCloudBtn, ritalinSyncFromCloudBtn, ritalinSyncToCloudBtn } = elements;
+          syncFromCloudBtn, syncToCloudBtn } = elements;
   if (isConfigured) {
     if (syncStatusText) syncStatusText.textContent = 'Connected';
     if (syncStatusDot) syncStatusDot.classList.add('connected');
@@ -154,8 +152,6 @@ export function updateSyncStatus(isConfigured, elements) {
     if (syncConfiguredSection) syncConfiguredSection.style.display = 'block';
     if (syncFromCloudBtn) syncFromCloudBtn.style.display = 'block';
     if (syncToCloudBtn) syncToCloudBtn.style.display = 'block';
-    if (ritalinSyncFromCloudBtn) ritalinSyncFromCloudBtn.style.display = 'block';
-    if (ritalinSyncToCloudBtn) ritalinSyncToCloudBtn.style.display = 'block';
   } else {
     if (syncStatusText) syncStatusText.textContent = 'Not configured';
     if (syncStatusDot) syncStatusDot.classList.remove('connected');
@@ -163,8 +159,6 @@ export function updateSyncStatus(isConfigured, elements) {
     if (syncConfiguredSection) syncConfiguredSection.style.display = 'none';
     if (syncFromCloudBtn) syncFromCloudBtn.style.display = 'none';
     if (syncToCloudBtn) syncToCloudBtn.style.display = 'none';
-    if (ritalinSyncFromCloudBtn) ritalinSyncFromCloudBtn.style.display = 'none';
-    if (ritalinSyncToCloudBtn) ritalinSyncToCloudBtn.style.display = 'none';
   }
 }
 
