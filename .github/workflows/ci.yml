@@ -71,7 +71,7 @@ jobs:
       run: ./test.sh --ci
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@v7
       with:
         file: ./backend/coverage.xml
         flags: backend
