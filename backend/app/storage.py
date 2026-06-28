@@ -5,6 +5,8 @@ Handles JSON file persistence with thread safety.
 """
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
@@ -50,5 +52,21 @@ def save_data(path: Path, data: Dict[str, Any]) -> None:
         data: Data dictionary to save
     """
     ensure_data_file(path)
-    with path.open("w") as fp:
-        json.dump(data, fp, indent=2)
+    # Write to a temp file and atomically replace the live file so Gunicorn
+    # workers never leave partially overwritten JSON if writes overlap.
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        text=True,
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w") as fp:
+            json.dump(data, fp, indent=2)
+            fp.flush()
+            os.fsync(fp.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()

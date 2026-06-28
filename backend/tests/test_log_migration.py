@@ -8,7 +8,7 @@ New format: data["events"] contains entries with {code, event: {id, date, timest
 from pathlib import Path
 
 from app.repository import LogRepository
-from app.storage import save_data
+from app.storage import load_data, save_data
 
 
 def _seed_logs(data_file: Path, log_entries: list) -> None:
@@ -156,3 +156,19 @@ def test_empty_logs_produces_no_events(tmp_path: Path):
     LogRepository(data_file).migrate_logs_to_events()
 
     assert LogRepository(data_file).get_events("CODE1") == []
+
+
+def test_save_data_replaces_longer_existing_file(tmp_path: Path):
+    """Saving shorter JSON replaces the previous contents without trailing bytes."""
+    data_file = tmp_path / "data.json"
+    save_data(
+        data_file,
+        {
+            "logs": [_log_entry("CODE1", "2026-01-15", spray=1)],
+            "events": [],
+            "codes": [],
+        },
+    )
+    save_data(data_file, {"logs": [], "events": [], "codes": []})
+
+    assert load_data(data_file) == {"logs": [], "events": [], "codes": []}
