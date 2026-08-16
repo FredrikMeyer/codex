@@ -71,7 +71,7 @@ class BackendServer(threading.Thread):
             self.port = self.server.port
             self._server_ready.set()
             self.server.serve_forever()
-        except Exception as e:
+        except OSError as e:
             print(f"Backend server failed to start: {e}")
             self._server_ready.set()  # Signal even on failure so we don't hang
 
@@ -103,8 +103,9 @@ def frontend_url():
 @pytest.fixture(scope="module")
 def backend_url(tmp_path_factory):
     """Start a backend server for E2E tests."""
-    import requests
     import time
+
+    import requests
 
     # Allow all origins so CORS is not a concern in tests
     os.environ["ALLOWED_ORIGINS"] = "*"
@@ -681,7 +682,7 @@ def test_sync_to_cloud_functionality(page: Page, frontend_url: str, backend_url)
 
 def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backend_url):
     """Test syncing down entries from cloud to frontend."""
-    backend_base_url, data_file = backend_url
+    backend_base_url, _data_file = backend_url
     page.add_init_script(f"window.backendUrl = '{backend_base_url}';")
     page.goto(frontend_url)
 
@@ -753,6 +754,7 @@ def test_sync_from_cloud_downloads_entries(page: Page, frontend_url: str, backen
 def test_clear_local_data_removes_entries(page: Page, frontend_url: str, backend_url):
     """Clear local data button wipes entries but keeps sync token."""
     import secrets
+
     from app.storage import load_data, save_data
 
     backend_base_url, data_file = backend_url

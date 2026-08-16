@@ -8,10 +8,10 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 
-def default_data() -> Dict[str, Any]:
+def default_data() -> dict[str, Any]:
     """Return the default data structure for a new storage file."""
     return {"codes": [], "logs": [], "ritalin_events": []}
 
@@ -28,7 +28,7 @@ def ensure_data_file(path: Path) -> None:
         path.write_text(json.dumps(default_data(), indent=2))
 
 
-def load_data(path: Path) -> Dict[str, Any]:
+def load_data(path: Path) -> dict[str, Any]:
     """
     Load data from storage file.
 
@@ -43,7 +43,7 @@ def load_data(path: Path) -> Dict[str, Any]:
         return json.load(fp)
 
 
-def save_data(path: Path, data: Dict[str, Any]) -> None:
+def save_data(path: Path, data: dict[str, Any]) -> None:
     """
     Save data to storage file.
 

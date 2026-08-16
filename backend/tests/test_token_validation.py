@@ -28,7 +28,7 @@ def client(tmp_path: Path):
 @pytest.fixture()
 def valid_token(client):
     """Generate a valid token for testing."""
-    test_client, data_file = client
+    test_client, _ = client
 
     # Generate code and token
     code = test_client.post("/generate-code").get_json()["code"]
@@ -39,7 +39,7 @@ def valid_token(client):
 
 def test_missing_authorization_header_returns_401(valid_token):
     """Request without Authorization header is rejected."""
-    token, test_client = valid_token
+    _token, test_client = valid_token
 
     # Try to access protected endpoint without header
     # Note: We'll create a test endpoint for this
@@ -72,7 +72,7 @@ def test_invalid_authorization_format_returns_401(valid_token):
 
 def test_invalid_token_returns_401(valid_token):
     """Request with invalid token is rejected."""
-    token, test_client = valid_token
+    _token, test_client = valid_token
 
     # Invalid token
     response = test_client.get(
@@ -114,7 +114,7 @@ def test_token_validation_is_case_sensitive(valid_token):
 
 def test_multiple_valid_tokens_work(client):
     """Multiple different tokens can all be validated."""
-    test_client, data_file = client
+    test_client, _data_file = client
 
     # Generate two different tokens
     code1 = test_client.post("/generate-code").get_json()["code"]
@@ -170,7 +170,7 @@ def test_whitespace_in_token_is_handled(valid_token):
 
 def test_empty_bearer_token_returns_401(valid_token):
     """Empty token after 'Bearer' is rejected."""
-    token, test_client = valid_token
+    _token, test_client = valid_token
 
     response = test_client.get(
         "/test-protected",

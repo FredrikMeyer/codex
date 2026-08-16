@@ -8,11 +8,16 @@ from collections.abc import Generator
 
 import pytest
 
-from app.sqlite_storage import AsthmaMedicineEventData, CodeEntry, RitalinEventData, SqliteStorage
+from app.sqlite_storage import (
+    AsthmaMedicineEventData,
+    CodeEntry,
+    RitalinEventData,
+    SqliteStorage,
+)
 
 
 @pytest.fixture()
-def storage() -> Generator[SqliteStorage, None, None]:
+def storage() -> Generator[SqliteStorage]:
     s = SqliteStorage(":memory:")
     yield s
     s.close()

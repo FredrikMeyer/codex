@@ -2,10 +2,11 @@ import logging
 import os
 import random
 import string
-from datetime import datetime
+from collections.abc import Callable
+from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -36,7 +37,7 @@ class BaseEvent(BaseModel):
     def validate_date_format(cls, v: str) -> str:
         """Validate date is in YYYY-MM-DD format."""
         try:
-            datetime.strptime(v, "%Y-%m-%d")
+            date.fromisoformat(v)
         except ValueError as e:
             raise ValueError(f"Date must be in YYYY-MM-DD format: {e}")
         return v
@@ -46,7 +47,7 @@ class BaseEvent(BaseModel):
     def validate_timestamp_format(cls, v: str) -> str:
         """Validate timestamp is a valid ISO 8601 datetime."""
         try:
-            datetime.fromisoformat(v.replace("Z", "+00:00"))
+            datetime.fromisoformat(v)
         except ValueError as e:
             raise ValueError(f"Timestamp must be a valid ISO 8601 datetime: {e}")
         return v
