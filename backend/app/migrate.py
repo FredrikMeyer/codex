@@ -8,9 +8,14 @@ runs twice.
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
-from .sqlite_storage import AsthmaMedicineEventData, CodeEntry, RitalinEventData, SqliteStorage
+from .sqlite_storage import (
+    AsthmaMedicineEventData,
+    CodeEntry,
+    RitalinEventData,
+    SqliteStorage,
+)
 
 
 def migrate_json_to_sqlite(json_path: Path, storage: SqliteStorage) -> None:
@@ -30,7 +35,7 @@ def migrate_json_to_sqlite(json_path: Path, storage: SqliteStorage) -> None:
         return
 
     with json_path.open() as fp:
-        data: Dict[str, Any] = json.load(fp)
+        data: dict[str, Any] = json.load(fp)
 
     for code_entry in data.get("codes", []):
         storage.upsert_code(

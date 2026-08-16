@@ -27,7 +27,7 @@ def client(tmp_path: Path):
 
 def test_generate_token_requires_valid_code(client):
     """Token generation requires a valid code."""
-    test_client, data_file = client
+    test_client, _data_file = client
 
     # Try to generate token without code
     response = test_client.post("/generate-token", json={})
@@ -42,7 +42,7 @@ def test_generate_token_requires_valid_code(client):
 
 def test_generate_token_with_valid_code(client):
     """Token is generated for a valid code."""
-    test_client, data_file = client
+    test_client, _data_file = client
 
     # Generate a code first
     code_response = test_client.post("/generate-code")
@@ -63,7 +63,7 @@ def test_generate_token_with_valid_code(client):
 
 def test_token_is_cryptographically_random(client):
     """Tokens should be cryptographically random (not predictable)."""
-    test_client, data_file = client
+    test_client, _data_file = client
 
     # Generate two codes
     code1 = test_client.post("/generate-code").get_json()["code"]
@@ -102,7 +102,7 @@ def test_token_is_persisted_with_code(client):
 
 def test_multiple_token_requests_return_same_token(client):
     """Requesting a token multiple times with same code returns the same token."""
-    test_client, data_file = client
+    test_client, _data_file = client
 
     # Generate code
     code = test_client.post("/generate-code").get_json()["code"]
@@ -136,7 +136,7 @@ def test_token_generation_updates_timestamp(client):
 
 def test_existing_endpoints_still_work(client):
     """Existing endpoints are not affected by token generation feature."""
-    test_client, data_file = client
+    test_client, _data_file = client
 
     # Generate code (existing endpoint)
     code_response = test_client.post("/generate-code")

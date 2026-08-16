@@ -5,7 +5,9 @@ Verifies that authenticated users can retrieve their 6-character code.
 """
 
 from pathlib import Path
+
 import pytest
+
 from app.main import create_app
 
 

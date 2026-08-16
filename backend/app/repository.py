@@ -7,15 +7,20 @@ Provides framework-independent data access, hiding storage implementation detail
 import secrets
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
-from .sqlite_storage import AsthmaMedicineEventData, CodeEntry, RitalinEventData, SqliteStorage
+from .sqlite_storage import (
+    AsthmaMedicineEventData,
+    CodeEntry,
+    RitalinEventData,
+    SqliteStorage,
+)
 from .storage import load_data, save_data
 
 
-def _to_code_entry(entry: Dict[str, Any]) -> CodeEntry:
+def _to_code_entry(entry: dict[str, Any]) -> CodeEntry:
     result: CodeEntry = {
         "code": entry["code"],
         "created_at": entry["created_at"],
@@ -45,7 +50,7 @@ class CodeRepository:
     def create_code(self, code: str) -> None:
         """Store a new authentication code."""
         with self._lock:
-            created_at = datetime.now(timezone.utc).isoformat()
+            created_at = datetime.now(UTC).isoformat()
             data = load_data(self.data_file)
             data.setdefault("codes", []).append({"code": code, "created_at": created_at})
             save_data(self.data_file, data)
@@ -63,7 +68,7 @@ class CodeRepository:
             data = load_data(self.data_file)
             for entry in data.get("codes", []):
                 if entry["code"] == code:
-                    entry["last_login_at"] = datetime.now(timezone.utc).isoformat()
+                    entry["last_login_at"] = datetime.now(UTC).isoformat()
                     save_data(self.data_file, data)
                     if self._sqlite:
                         self._sqlite.upsert_code(_to_code_entry(entry))
@@ -83,7 +88,7 @@ class CodeRepository:
                 if entry["code"] == code:
                     if "token" not in entry:
                         entry["token"] = secrets.token_hex(32)
-                        entry["token_generated_at"] = datetime.now(timezone.utc).isoformat()
+                        entry["token_generated_at"] = datetime.now(UTC).isoformat()
                         save_data(self.data_file, data)
                     if self._sqlite:
                         self._sqlite.upsert_code(_to_code_entry(entry))
@@ -132,7 +137,7 @@ class LogRepository:
         self._lock = threading.Lock()
         self._sqlite = sqlite
 
-    def save_events_batch(self, code: str, events: List[Dict[str, Any]]) -> int:
+    def save_events_batch(self, code: str, events: list[dict[str, Any]]) -> int:
         """
         Save multiple usage events in one operation, skipping any with IDs that already exist.
 
@@ -148,7 +153,7 @@ class LogRepository:
                     for entry in data.get("events", [])
                     if entry.get("code") == code
                 }
-            received_at = datetime.now(timezone.utc).isoformat()
+            received_at = datetime.now(UTC).isoformat()
             new_entries = [
                 {"code": code, "event": event_data, "received_at": received_at}
                 for event_data in events
@@ -163,7 +168,7 @@ class LogRepository:
                         self._sqlite.insert_event(code, cast(AsthmaMedicineEventData, entry["event"]), received_at)
             return len(new_entries)
 
-    def save_event(self, code: str, event_data: Dict[str, Any]) -> None:
+    def save_event(self, code: str, event_data: dict[str, Any]) -> None:
         """
         Save a usage event for a user, skipping if the same id already exists.
         """
@@ -180,7 +185,7 @@ class LogRepository:
                     }
                 if event_id in existing_ids:
                     return
-            received_at = datetime.now(timezone.utc).isoformat()
+            received_at = datetime.now(UTC).isoformat()
             data = load_data(self.data_file)
             data.setdefault("events", []).append({
                 "code": code,
@@ -191,7 +196,7 @@ class LogRepository:
             if self._sqlite:
                 self._sqlite.insert_event(code, cast(AsthmaMedicineEventData, event_data), received_at)
 
-    def get_events(self, code: str) -> List[Dict[str, Any]]:
+    def get_events(self, code: str) -> list[dict[str, Any]]:
         """
         Retrieve all usage events for a user.
 
@@ -202,7 +207,7 @@ class LogRepository:
             List of events with id, date, timestamp, type, count, preventive, received_at
         """
         if self._sqlite:
-            return [cast(Dict[str, Any], e) for e in self._sqlite.get_events(code)]
+            return [cast(dict[str, Any], e) for e in self._sqlite.get_events(code)]
         with self._lock:
             data = load_data(self.data_file)
             return [
@@ -245,12 +250,12 @@ class LogRepository:
                 for entry in data.get("events", [])
             }
 
-            new_entries: List[Dict[str, Any]] = []
+            new_entries: list[dict[str, Any]] = []
             for log_entry in logs:
                 code = log_entry.get("code", "")
                 log = log_entry.get("log", {})
                 date = log.get("date", "")
-                received_at = log_entry.get("received_at", datetime.now(timezone.utc).isoformat())
+                received_at = log_entry.get("received_at", datetime.now(UTC).isoformat())
 
                 for medicine_type in ("spray", "ventoline"):
                     count = log.get(medicine_type) or 0
@@ -277,7 +282,7 @@ class LogRepository:
                 data.setdefault("events", []).extend(new_entries)
                 save_data(self.data_file, data)
 
-    def save_ritalin_events_batch(self, code: str, events: List[Dict[str, Any]]) -> int:
+    def save_ritalin_events_batch(self, code: str, events: list[dict[str, Any]]) -> int:
         """
         Save multiple Ritalin dose events in one operation, skipping any with IDs that already exist.
 
@@ -293,7 +298,7 @@ class LogRepository:
                     for entry in data.get("ritalin_events", [])
                     if entry.get("code") == code
                 }
-            received_at = datetime.now(timezone.utc).isoformat()
+            received_at = datetime.now(UTC).isoformat()
             new_entries = [
                 {"code": code, "event": event_data, "received_at": received_at}
                 for event_data in events
@@ -308,7 +313,7 @@ class LogRepository:
                         self._sqlite.insert_ritalin_event(code, cast(RitalinEventData, entry["event"]), received_at)
             return len(new_entries)
 
-    def save_ritalin_event(self, code: str, event_data: Dict[str, Any]) -> None:
+    def save_ritalin_event(self, code: str, event_data: dict[str, Any]) -> None:
         """
         Save a Ritalin dose event for a user, skipping if the same id already exists.
         """
@@ -325,7 +330,7 @@ class LogRepository:
                     }
                 if event_id in existing_ids:
                     return
-            received_at = datetime.now(timezone.utc).isoformat()
+            received_at = datetime.now(UTC).isoformat()
             data = load_data(self.data_file)
             data.setdefault("ritalin_events", []).append({
                 "code": code,
@@ -336,7 +341,7 @@ class LogRepository:
             if self._sqlite:
                 self._sqlite.insert_ritalin_event(code, cast(RitalinEventData, event_data), received_at)
 
-    def get_ritalin_events(self, code: str) -> List[Dict[str, Any]]:
+    def get_ritalin_events(self, code: str) -> list[dict[str, Any]]:
         """
         Retrieve all Ritalin dose events for a user.
 
@@ -347,7 +352,7 @@ class LogRepository:
             List of events with id, date, timestamp, count, received_at
         """
         if self._sqlite:
-            return [cast(Dict[str, Any], e) for e in self._sqlite.get_ritalin_events(code)]
+            return [cast(dict[str, Any], e) for e in self._sqlite.get_ritalin_events(code)]
         with self._lock:
             data = load_data(self.data_file)
             return [
@@ -362,7 +367,7 @@ class LogRepository:
                 if entry.get("code") == code
             ]
 
-    def delete_events(self, code: str, ids: List[str]) -> None:
+    def delete_events(self, code: str, ids: list[str]) -> None:
         """Remove asthma events by ID for a user. Unknown IDs are silently ignored."""
         id_set = set(ids)
         with self._lock:
@@ -376,7 +381,7 @@ class LogRepository:
                 for event_id in ids:
                     self._sqlite.delete_event(code, event_id)
 
-    def delete_ritalin_events(self, code: str, ids: List[str]) -> None:
+    def delete_ritalin_events(self, code: str, ids: list[str]) -> None:
         """Remove ritalin events by ID for a user. Unknown IDs are silently ignored."""
         id_set = set(ids)
         with self._lock:
