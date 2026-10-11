@@ -1,5 +1,5 @@
 import { lastTypeKey } from './config.js';
-import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescueSummary } from './tracker.js';
+import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescueSummary, parseTabFromSearch } from './tracker.js';
 import { buildReportHtml } from './report.js';
 import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries } from './storage.js';
 import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, renderWeeklySummary } from './ui.js';
@@ -162,20 +162,28 @@ doctorReportBtn.addEventListener('click', () => {
 const tabButtons = document.querySelectorAll('.tab');
 const tabPanels = document.querySelectorAll('.tab-panel');
 
+/** @param {string} tabName @returns {void} */
+function activateTab(tabName) {
+  tabButtons.forEach((b) => {
+    const selected = /** @type {HTMLElement} */ (b).dataset['tab'] === tabName;
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-selected', String(selected));
+  });
+  tabPanels.forEach((p) => {
+    const selected = /** @type {HTMLElement} */ (p).dataset['panel'] === tabName;
+    if (selected) p.removeAttribute('hidden');
+    else p.setAttribute('hidden', '');
+  });
+}
+
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
-    tabButtons.forEach((b) => {
-      b.classList.remove('active');
-      b.setAttribute('aria-selected', 'false');
-    });
-    tabPanels.forEach((p) => p.setAttribute('hidden', ''));
-
-    btn.classList.add('active');
-    btn.setAttribute('aria-selected', 'true');
-    const panel = document.querySelector(`.tab-panel[data-panel="${/** @type {HTMLElement} */ (btn).dataset['tab']}"]`);
-    if (panel) panel.removeAttribute('hidden');
+    activateTab(/** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset['tab']));
   });
 });
+
+const requestedTab = parseTabFromSearch(location.search);
+if (requestedTab) activateTab(requestedTab);
 
 /** @param {RitalinEvent[]} events @returns {void} */
 function renderRitalinAll(events) {

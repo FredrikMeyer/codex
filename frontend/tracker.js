@@ -244,3 +244,12 @@ export function smartMerge(localEntries, cloudEntries) {
 
   return { entries: [...updatedLocal, ...trulyNew], newCount: trulyNew.length, idUpdates: matchedLocalIndices.size };
 }
+
+/**
+ * @param {string} search
+ * @returns {'asthma' | 'ritalin' | null}
+ */
+export function parseTabFromSearch(search) {
+  const tab = new URLSearchParams(search).get('tab');
+  return tab === 'asthma' || tab === 'ritalin' ? tab : null;
+}

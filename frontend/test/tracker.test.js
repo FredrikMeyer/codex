@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
 
 test('generateId returns a non-empty string', () => {
   const id = generateId();
@@ -379,4 +379,21 @@ test('worstWeeks ignores events older than 26 weeks', () => {
   const oldDate = Temporal.Now.plainDateISO().subtract({ weeks: 27 }).toString();
   const events = [{ date: oldDate, count: 10, preventive: false }];
   assert.deepEqual(worstWeeks(events), []);
+});
+
+test('parseTabFromSearch returns ritalin for ?tab=ritalin', () => {
+  assert.equal(parseTabFromSearch('?tab=ritalin'), 'ritalin');
+});
+
+test('parseTabFromSearch returns asthma for ?tab=asthma', () => {
+  assert.equal(parseTabFromSearch('?tab=asthma'), 'asthma');
+});
+
+test('parseTabFromSearch returns null when tab param is absent', () => {
+  assert.equal(parseTabFromSearch(''), null);
+  assert.equal(parseTabFromSearch('?foo=bar'), null);
+});
+
+test('parseTabFromSearch returns null for an unknown tab value', () => {
+  assert.equal(parseTabFromSearch('?tab=bogus'), null);
 });

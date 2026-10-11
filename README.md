@@ -46,7 +46,7 @@ See [backend/README.md](backend/README.md) for details and [DEPLOY.md](DEPLOY.md
 
 ### Quick Start (Local Development)
 
-**Option 1: Run both frontend and backend together** (recommended)
+**Option 1: Run both frontend and backend together**
 ```bash
 ./dev.sh
 ```

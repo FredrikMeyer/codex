@@ -19,5 +19,21 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Register Asthma",
+      "short_name": "Asthma",
+      "description": "Register asthma medicine usage",
+      "url": "/codex/?tab=asthma",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Register Ritalin",
+      "short_name": "Ritalin",
+      "description": "Register Ritalin medicine usage",
+      "url": "/codex/?tab=ritalin",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }
