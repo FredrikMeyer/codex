@@ -8,7 +8,7 @@ dependencies = [
     "flask-cors>=6.0.5",
     "flask-limiter>=4.1.1",
     "gunicorn>=26.2.0",
-    "pydantic>=2.13.5",
+    "pydantic>=2.14.1",
     "pytest==9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-playwright>=0.9.0",
@@ -19,7 +19,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff>=0.16.10",
-    "ty>=0.0.85",
+    "ty>=0.0.87",
 ]
 
 [tool.pyright]
