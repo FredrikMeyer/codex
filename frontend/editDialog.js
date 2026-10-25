@@ -1,6 +1,7 @@
-import { updateEntry } from './tracker.js';
+import { generateId, replaceEntry } from './tracker.js';
 import { saveEntries, saveRitalinEntries } from './storage.js';
 import { toast } from './ui.js';
+import { deleteEventsFromCloud, deleteRitalinEventsFromCloud } from './syncService.js';
 
 // --- Asthma edit dialog ---
 const asthmaEditDialog = /** @type {HTMLDialogElement} */ (document.getElementById('asthma-edit-dialog'));
@@ -56,6 +57,7 @@ export function initAsthmaEditDialog(getEntries, setEntries, onSaved) {
     /** @type {UsageEvent} */
     const updated = {
       ...editingAsthmaEntry,
+      id: generateId(),
       date: newDate,
       timestamp: Temporal.PlainDateTime.from(`${newDate}T${newTime}:00`)
         .toZonedDateTime(Temporal.Now.timeZoneId())
@@ -65,9 +67,10 @@ export function initAsthmaEditDialog(getEntries, setEntries, onSaved) {
       count: newCount,
       preventive: editingAsthmaPreventive
     };
-    const newEntries = updateEntry(_getAsthmaEntries(), updated);
+    const newEntries = replaceEntry(_getAsthmaEntries(), editingAsthmaEntry.id, updated);
     _setAsthmaEntries(newEntries);
     saveEntries(newEntries);
+    deleteEventsFromCloud([editingAsthmaEntry.id]);
     _onAsthmaSaved(newEntries);
     asthmaEditDialog.close();
     toast('Entry updated');
@@ -132,6 +135,7 @@ export function initRitalinEditDialog(getEntries, setEntries, onSaved) {
     /** @type {RitalinEvent} */
     const updated = {
       ...editingRitalinEntry,
+      id: generateId(),
       date: newDate,
       timestamp: Temporal.PlainDateTime.from(`${newDate}T${newTime}:00`)
         .toZonedDateTime(Temporal.Now.timeZoneId())
@@ -139,9 +143,10 @@ export function initRitalinEditDialog(getEntries, setEntries, onSaved) {
         .toString(),
       count: newCount
     };
-    const newEntries = updateEntry(_getRitalinEntries(), updated);
+    const newEntries = replaceEntry(_getRitalinEntries(), editingRitalinEntry.id, updated);
     _setRitalinEntries(newEntries);
     saveRitalinEntries(newEntries);
+    deleteRitalinEventsFromCloud([editingRitalinEntry.id]);
     _onRitalinSaved(newEntries);
     ritalinEditDialog.close();
     toast('Entry updated');

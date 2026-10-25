@@ -202,11 +202,12 @@ export function worstWeeks(events, n = 3) {
 /**
  * @template {UsageEvent | RitalinEvent} T
  * @param {T[]} entries
- * @param {T} updatedEntry
+ * @param {string} oldId
+ * @param {T} replacement
  * @returns {T[]}
  */
-export function updateEntry(entries, updatedEntry) {
-  return entries.map((e) => (e.id === updatedEntry.id ? { ...updatedEntry } : e));
+export function replaceEntry(entries, oldId, replacement) {
+  return entries.map((e) => (e.id === oldId ? replacement : e));
 }
 
 /**

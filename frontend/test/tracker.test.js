@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, reconcile, unsyncedEntries, removeEntriesOnDate, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, reconcile, unsyncedEntries, removeEntriesOnDate, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, replaceEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
 
 const ev = (id) => ({ id, date: '2024-01-01', type: 'ventoline', count: 1, preventive: false });
 
@@ -234,25 +234,10 @@ test('weeklyRescueSummary delta is thisWeek minus lastWeek', () => {
   assert.equal(result.delta, -2);
 });
 
-test('updateEntry replaces the entry with the matching id', () => {
-  const entries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false },
-    { id: 'b', date: '2024-01-02', type: 'spray', count: 1, preventive: false }
-  ];
-  const result = updateEntry(entries, { id: 'a', date: '2024-01-01', type: 'spray', count: 3, preventive: true });
-  assert.equal(result[0].type, 'spray');
+test('replaceEntry swaps the old entry for the replacement in place', () => {
+  const result = replaceEntry([ev('a'), ev('b')], 'a', { ...ev('new'), count: 3 });
+  assert.deepEqual(result.map((e) => e.id), ['new', 'b']);
   assert.equal(result[0].count, 3);
-  assert.equal(result[0].preventive, true);
-  assert.equal(result[1].id, 'b');
-  assert.equal(result.length, 2);
-});
-
-test('updateEntry returns unchanged array when id not found', () => {
-  const entries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
-  ];
-  const result = updateEntry(entries, { id: 'z', date: '2024-01-01', type: 'spray', count: 1, preventive: false });
-  assert.deepEqual(result, entries);
 });
 
 // aggregateByMonth
