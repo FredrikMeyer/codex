@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:?run via mise, which sets it from mise.toml}
     container_name: asthma-backend
     restart: unless-stopped
 

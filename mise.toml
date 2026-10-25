@@ -1,2 +1,9 @@
 [tools]
 python = "3.14"
+
+[env]
+# Make uv build on mise's Python instead of downloading its own
+UV_PYTHON_PREFERENCE = "only-system"
+UV_PYTHON_DOWNLOADS = "never"
+# Exposes the Python version above to Docker builds
+PYTHON_VERSION = "{{ exec(command='mise config get -f ' ~ config_root ~ '/mise.toml tools.python') }}"

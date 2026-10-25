@@ -34,6 +34,9 @@ Let's Encrypt          Flask app
 - Domain name pointing to server (e.g., `asthma.fredrikmeyer.net`)
 - Port 80 and 443 open in firewall
 - Docker and Docker Compose installed
+- [mise](https://mise.jdx.dev) for building the image: the Python version comes from `mise.toml`,
+  so run builds in a mise-activated shell (or prefix with `mise exec --`). Pulling the published
+  image via `docker-compose.prod.yml` does not need mise.
 
 ## Step 1: Install Docker
 

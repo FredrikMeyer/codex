@@ -1,5 +1,8 @@
 # Multi-stage build for smaller final image
-FROM python:3.14-slim as builder
+# PYTHON_VERSION comes from mise.toml (exported by mise as an env var)
+ARG PYTHON_VERSION
+
+FROM python:${PYTHON_VERSION:?PYTHON_VERSION-not-set-see-mise.toml}-slim as builder
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -14,7 +17,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 # Final stage
-FROM python:3.14-slim
+FROM python:${PYTHON_VERSION}-slim
 
 # Install security updates
 RUN apt-get update && \
