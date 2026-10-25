@@ -787,6 +787,11 @@ def test_clear_local_data_removes_entries(page: Page, frontend_url: str, backend
 
     expect(page.locator(".entry")).to_have_count(2)
 
+    page.evaluate(
+        "localStorage.setItem('ritalin-usage-entries', JSON.stringify("
+        "[{id: 'r1', date: '2026-02-10', timestamp: '2026-02-10T12:00:00.000Z', count: 1}]))"
+    )
+
     # Click clear local data and confirm
     page.on("dialog", lambda dialog: dialog.accept())
     page.locator("#clear-local-data").click()
@@ -794,6 +799,7 @@ def test_clear_local_data_removes_entries(page: Page, frontend_url: str, backend
 
     # Entries should be gone
     expect(page.locator(".entry")).to_have_count(0)
+    assert page.evaluate("localStorage.getItem('ritalin-usage-entries')") == "[]"
 
     # Toast confirms the action
     expect(page.locator("#toast")).to_contain_text("Local data cleared")

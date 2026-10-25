@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, smartMerge, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, smartMerge, removeEntriesOnDate, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
+
+const ev = (id) => ({ id, date: '2024-01-01', type: 'ventoline', count: 1, preventive: false });
 
 test('generateId returns a non-empty string', () => {
   const id = generateId();
@@ -155,6 +157,13 @@ test('smartMerge deduplicates by (date, type, count, preventive)', () => {
   assert.equal(newCount, 0);
   assert.equal(idUpdates, 2);
   assert.equal(entries.length, 2);
+});
+
+test('removeEntriesOnDate keeps other days and reports removed ids', () => {
+  const entries = [{ ...ev('a'), date: '2024-01-01' }, { ...ev('b'), date: '2024-01-02' }];
+  const { kept, removedIds } = removeEntriesOnDate(entries, '2024-01-01');
+  assert.deepEqual(kept.map((e) => e.id), ['b']);
+  assert.deepEqual(removedIds, ['a']);
 });
 
 test('migrateToEventLog returns array unchanged', () => {

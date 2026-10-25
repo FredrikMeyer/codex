@@ -1,5 +1,5 @@
 import { lastTypeKey } from './config.js';
-import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescueSummary, parseTabFromSearch } from './tracker.js';
+import { generateId, createTimestamp, sumForType, migrateToEventLog, weeklyRescueSummary, parseTabFromSearch, removeEntriesOnDate } from './tracker.js';
 import { buildReportHtml } from './report.js';
 import { loadEntries, saveEntries, loadRitalinEntries, saveRitalinEntries } from './storage.js';
 import { toast, renderAsthmaHistory, renderAsthmaChart, renderRitalinHistory, renderRitalinChart, renderWeeklySummary } from './ui.js';
@@ -27,15 +27,20 @@ let selectedMedicineType = /** @type {MedicineType} */ (localStorage.getItem(las
 let preventive = false;
 
 
+/** @param {string} date @returns {void} */
+function removeAsthmaDay(date) {
+  const { kept, removedIds } = removeEntriesOnDate(entries, date);
+  entries = kept;
+  saveEntries(entries);
+  deleteEventsFromCloud(removedIds);
+  renderAll(entries);
+}
+
 /** @param {UsageEvent[]} events @returns {void} */
 function renderAll(events) {
   renderWeeklySummary(weeklyRescueSummary(events));
   renderAsthmaHistory(events, (date) => {
-    const removedIds = entries.filter((e) => e.date === date).map((e) => e.id);
-    entries = entries.filter((e) => e.date !== date);
-    saveEntries(entries);
-    deleteEventsFromCloud(removedIds);
-    renderAll(entries);
+    removeAsthmaDay(date);
     toast('Entry removed');
   }, openAsthmaEditDialog);
   renderAsthmaChart(events);
@@ -126,11 +131,8 @@ saveBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
-  const dateKey = formatDate(usageDate.value);
-  entries = entries.filter((e) => e.date !== dateKey);
+  removeAsthmaDay(formatDate(usageDate.value));
   updateCount(0);
-  saveEntries(entries);
-  renderAll(entries);
   toast('Reset for day');
 });
 
@@ -185,14 +187,19 @@ tabButtons.forEach((btn) => {
 const requestedTab = parseTabFromSearch(location.search);
 if (requestedTab) activateTab(requestedTab);
 
+/** @param {string} date @returns {void} */
+function removeRitalinDay(date) {
+  const { kept, removedIds } = removeEntriesOnDate(ritalinEntries, date);
+  ritalinEntries = kept;
+  saveRitalinEntries(ritalinEntries);
+  deleteRitalinEventsFromCloud(removedIds);
+  renderRitalinAll(ritalinEntries);
+}
+
 /** @param {RitalinEvent[]} events @returns {void} */
 function renderRitalinAll(events) {
   renderRitalinHistory(events, (date) => {
-    const removedIds = ritalinEntries.filter((e) => e.date === date).map((e) => e.id);
-    ritalinEntries = ritalinEntries.filter((e) => e.date !== date);
-    saveRitalinEntries(ritalinEntries);
-    deleteRitalinEventsFromCloud(removedIds);
-    renderRitalinAll(ritalinEntries);
+    removeRitalinDay(date);
     toast('Entry removed');
   }, openRitalinEditDialog);
   renderRitalinChart(events);
@@ -245,11 +252,8 @@ ritalinSaveBtn.addEventListener('click', () => {
 });
 
 ritalinResetBtn.addEventListener('click', () => {
-  const dateKey = formatDate(ritalinDateEl.value);
-  ritalinEntries = ritalinEntries.filter((e) => e.date !== dateKey);
+  removeRitalinDay(formatDate(ritalinDateEl.value));
   ritalinCountEl.textContent = '0';
-  saveRitalinEntries(ritalinEntries);
-  renderRitalinAll(ritalinEntries);
   toast('Reset for day');
 });
 
@@ -292,7 +296,12 @@ initSyncService({
   setRitalinEntries: (e) => { ritalinEntries = e; },
   onSynced: (newEntries) => renderAll(newEntries),
   onRitalinSynced: (newEntries) => renderRitalinAll(newEntries),
-  onLocalDataCleared: () => { updateCount(0); renderAll(entries); }
+  onLocalDataCleared: () => {
+    updateCount(0);
+    renderAll(entries);
+    ritalinCountEl.textContent = '0';
+    renderRitalinAll(ritalinEntries);
+  }
 });
 
 const BASE_PATH = '/codex/';

@@ -109,6 +109,8 @@ function clearLocalData() {
   if (confirm('Clear all local data on this device? Your cloud data is unaffected. You can sync it back afterwards.')) {
     if (_setEntries) _setEntries([]);
     saveEntries([]);
+    if (_setRitalinEntries) _setRitalinEntries([]);
+    saveRitalinEntries([]);
     if (_onLocalDataCleared) _onLocalDataCleared();
     toast('Local data cleared');
   }

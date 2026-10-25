@@ -246,6 +246,19 @@ export function smartMerge(localEntries, cloudEntries) {
 }
 
 /**
+ * @template {UsageEvent | RitalinEvent} T
+ * @param {T[]} entries
+ * @param {string} date
+ * @returns {{ kept: T[], removedIds: string[] }}
+ */
+export function removeEntriesOnDate(entries, date) {
+  return {
+    kept: entries.filter((e) => e.date !== date),
+    removedIds: entries.filter((e) => e.date === date).map((e) => e.id)
+  };
+}
+
+/**
  * @param {string} search
  * @returns {'asthma' | 'ritalin' | null}
  */
