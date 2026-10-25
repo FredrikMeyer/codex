@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateByDate, aggregateRitalinByDate, smartMerge, removeEntriesOnDate, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
+import { aggregateByDate, aggregateRitalinByDate, reconcile, unsyncedEntries, removeEntriesOnDate, migrateToEventLog, getEventsForDate, sumForType, createTimestamp, generateId, updateEntry, weeklyRescueSummary, aggregateByMonth, worstWeeks, parseTabFromSearch } from '../tracker.js';
 
 const ev = (id) => ({ id, date: '2024-01-01', type: 'ventoline', count: 1, preventive: false });
 
@@ -104,59 +104,34 @@ test('aggregateRitalinByDate ignores old events', () => {
   assert.equal(result.length, 0);
 });
 
-test('smartMerge returns original entries when cloud is already in sync', () => {
-  const localEntries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
-  ];
-  const cloudEntries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
-  ];
-  const { entries, newCount, idUpdates } = smartMerge(localEntries, cloudEntries);
-  assert.equal(newCount, 0);
-  assert.equal(idUpdates, 0);
-  assert.deepEqual(entries, localEntries);
+// reconcile: merging cloud events into local ones
+
+test('reconcile adds cloud events missing locally', () => {
+  const { entries, added } = reconcile([ev('a')], [ev('a'), ev('b')], new Set(['a']));
+  assert.deepEqual(entries.map((e) => e.id), ['a', 'b']);
+  assert.equal(added, 1);
 });
 
-test('smartMerge adds truly new cloud events', () => {
-  const localEntries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
-  ];
-  const cloudEntries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false },
-    { id: 'b', date: '2024-01-02', type: 'spray', count: 1, preventive: true }
-  ];
-  const { entries, newCount } = smartMerge(localEntries, cloudEntries);
-  assert.equal(newCount, 1);
-  assert.equal(entries.length, 2);
-  assert.ok(entries.some((e) => e.id === 'b'));
+test('reconcile drops synced local events deleted on another device', () => {
+  const { entries, removed } = reconcile([ev('a'), ev('b')], [ev('a')], new Set(['a', 'b']));
+  assert.deepEqual(entries.map((e) => e.id), ['a']);
+  assert.equal(removed, 1);
 });
 
-test('smartMerge updates local ID when functionally equivalent cloud event has different ID', () => {
-  const localEntries = [
-    { id: 'local-id', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
-  ];
-  const cloudEntries = [
-    { id: 'cloud-id', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false }
-  ];
-  const { entries, newCount, idUpdates } = smartMerge(localEntries, cloudEntries);
-  assert.equal(newCount, 0);
-  assert.equal(idUpdates, 1);
-  assert.equal(entries[0].id, 'cloud-id');
+test('reconcile keeps local events not yet uploaded', () => {
+  const { entries, removed } = reconcile([ev('local')], [], new Set());
+  assert.deepEqual(entries.map((e) => e.id), ['local']);
+  assert.equal(removed, 0);
 });
 
-test('smartMerge deduplicates by (date, type, count, preventive)', () => {
-  const localEntries = [
-    { id: 'a', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false },
-    { id: 'b', date: '2024-01-01', type: 'spray', count: 1, preventive: false }
-  ];
-  const cloudEntries = [
-    { id: 'c', date: '2024-01-01', type: 'ventoline', count: 2, preventive: false },
-    { id: 'd', date: '2024-01-01', type: 'spray', count: 1, preventive: false }
-  ];
-  const { entries, newCount, idUpdates } = smartMerge(localEntries, cloudEntries);
-  assert.equal(newCount, 0);
-  assert.equal(idUpdates, 2);
-  assert.equal(entries.length, 2);
+test('reconcile keeps two identical-looking doses from different devices apart', () => {
+  const { entries } = reconcile([ev('mine')], [ev('theirs')], new Set());
+  assert.deepEqual(entries.map((e) => e.id), ['mine', 'theirs']);
+});
+
+test('unsyncedEntries returns only events the cloud has not received', () => {
+  const result = unsyncedEntries([ev('a'), ev('b')], new Set(['a']));
+  assert.deepEqual(result.map((e) => e.id), ['b']);
 });
 
 test('removeEntriesOnDate keeps other days and reports removed ids', () => {

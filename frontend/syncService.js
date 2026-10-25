@@ -1,5 +1,5 @@
-import { smartMerge } from './tracker.js';
-import { saveEntries, saveRitalinEntries, getToken, setToken, clearToken, hasToken } from './storage.js';
+import { reconcile, unsyncedEntries } from './tracker.js';
+import { saveEntries, saveRitalinEntries, getToken, setToken, clearToken, hasToken, loadAsthmaSyncedIds, saveAsthmaSyncedIds, loadRitalinSyncedIds, saveRitalinSyncedIds } from './storage.js';
 import { apiGenerateCode, apiGenerateToken, apiFetchCode, apiUploadEvents, apiDownloadEvents, apiUploadRitalinEvents, apiDownloadRitalinEvents, apiDeleteEvents, apiDeleteRitalinEvents } from './api.js';
 import { toast, updateSyncStatus as renderSyncStatus } from './ui.js';
 
@@ -172,6 +172,19 @@ function describeCombinedCount(asthma, ritalin) {
   return `${parts.join(' + ')} ${noun}`;
 }
 
+/**
+ * @param {number} asthmaAdded
+ * @param {number} ritalinAdded
+ * @param {number} removed
+ * @returns {string}
+ */
+function describeDownload(asthmaAdded, ritalinAdded, removed) {
+  const parts = [];
+  if (asthmaAdded + ritalinAdded > 0) parts.push(`Synced ${describeCombinedCount(asthmaAdded, ritalinAdded)} from cloud`);
+  if (removed > 0) parts.push(`Removed ${removed} deleted on another device`);
+  return parts.length === 0 ? 'Already in sync' : `✓ ${parts.join('. ')}`;
+}
+
 /** @returns {Promise<void>} */
 async function syncToCloud() {
   const token = getToken();
@@ -180,11 +193,13 @@ async function syncToCloud() {
     return;
   }
 
-  const asthmaEntries = _getEntries ? _getEntries() : [];
-  const ritalinEntries = _getRitalinEntries ? _getRitalinEntries() : [];
+  const asthmaSyncedIds = loadAsthmaSyncedIds();
+  const ritalinSyncedIds = loadRitalinSyncedIds();
+  const asthmaEntries = unsyncedEntries(_getEntries ? _getEntries() : [], asthmaSyncedIds);
+  const ritalinEntries = unsyncedEntries(_getRitalinEntries ? _getRitalinEntries() : [], ritalinSyncedIds);
 
   if (asthmaEntries.length === 0 && ritalinEntries.length === 0) {
-    toast('No entries to sync');
+    toast('Nothing new to sync');
     return;
   }
 
@@ -200,6 +215,8 @@ async function syncToCloud() {
       : Promise.resolve({ successCount: 0, errorCount: 0 });
 
     const [asthmaResult, ritalinResult] = await Promise.all([asthmaUpload, ritalinUpload]);
+    saveAsthmaSyncedIds(new Set([...asthmaSyncedIds, ...asthmaEntries.map((e) => e.id)]));
+    saveRitalinSyncedIds(new Set([...ritalinSyncedIds, ...ritalinEntries.map((e) => e.id)]));
 
     const totalErrors = asthmaResult.errorCount + ritalinResult.errorCount;
     const totalSuccess = asthmaResult.successCount + ritalinResult.successCount;
@@ -237,32 +254,23 @@ async function syncFromCloud() {
       apiDownloadRitalinEvents(token)
     ]);
 
-    const localAsthma = _getEntries ? _getEntries() : [];
-    const { entries: mergedAsthma, newCount: newAsthmaCount, idUpdates } =
-      smartMerge(localAsthma, asthmaData.events);
-
-    if (newAsthmaCount > 0 || idUpdates > 0) {
-      if (_setEntries) _setEntries(mergedAsthma);
-      saveEntries(mergedAsthma);
-      if (_onSynced) _onSynced(mergedAsthma);
+    const asthma = reconcile(_getEntries ? _getEntries() : [], asthmaData.events, loadAsthmaSyncedIds());
+    if (asthma.added > 0 || asthma.removed > 0) {
+      if (_setEntries) _setEntries(asthma.entries);
+      saveEntries(asthma.entries);
+      if (_onSynced) _onSynced(asthma.entries);
     }
+    saveAsthmaSyncedIds(new Set(asthmaData.events.map((e) => e.id)));
 
-    const localRitalin = _getRitalinEntries ? _getRitalinEntries() : [];
-    const localRitalinIds = new Set(localRitalin.map((e) => e.id));
-    const newRitalinEvents = ritalinData.events.filter((e) => !localRitalinIds.has(e.id));
-
-    if (newRitalinEvents.length > 0) {
-      const mergedRitalin = [...localRitalin, ...newRitalinEvents];
-      if (_setRitalinEntries) _setRitalinEntries(mergedRitalin);
-      saveRitalinEntries(mergedRitalin);
-      if (_onRitalinSynced) _onRitalinSynced(mergedRitalin);
+    const ritalin = reconcile(_getRitalinEntries ? _getRitalinEntries() : [], ritalinData.events, loadRitalinSyncedIds());
+    if (ritalin.added > 0 || ritalin.removed > 0) {
+      if (_setRitalinEntries) _setRitalinEntries(ritalin.entries);
+      saveRitalinEntries(ritalin.entries);
+      if (_onRitalinSynced) _onRitalinSynced(ritalin.entries);
     }
+    saveRitalinSyncedIds(new Set(ritalinData.events.map((e) => e.id)));
 
-    if (newAsthmaCount === 0 && newRitalinEvents.length === 0) {
-      toast('Already in sync');
-    } else {
-      toast(`✓ Synced ${describeCombinedCount(newAsthmaCount, newRitalinEvents.length)} from cloud`);
-    }
+    toast(describeDownload(asthma.added, ritalin.added, asthma.removed + ritalin.removed));
   } catch (error) {
     toast(/** @type {Error} */ (error).message || 'Sync failed. Check your connection.');
     console.error('Sync from cloud error:', error);

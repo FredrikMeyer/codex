@@ -210,42 +210,6 @@ export function updateEntry(entries, updatedEntry) {
 }
 
 /**
- * @param {UsageEvent[]} localEntries
- * @param {UsageEvent[]} cloudEntries
- * @returns {MergeResult<UsageEvent>}
- */
-export function smartMerge(localEntries, cloudEntries) {
-  const localIds = new Set(localEntries.map((e) => e.id));
-  const unmatched = cloudEntries.filter((e) => !localIds.has(e.id));
-
-  if (unmatched.length === 0) {
-    return { entries: localEntries, newCount: 0, idUpdates: 0 };
-  }
-
-  const matchedLocalIndices = new Set();
-  const trulyNew = [];
-  const updatedLocal = [...localEntries];
-
-  for (const cloudEvent of unmatched) {
-    const localIdx = updatedLocal.findIndex(
-      (e, i) => !matchedLocalIndices.has(i) &&
-                 e.date === cloudEvent.date &&
-                 e.type === cloudEvent.type &&
-                 e.count === cloudEvent.count &&
-                 Boolean(e.preventive) === Boolean(cloudEvent.preventive)
-    );
-    if (localIdx !== -1) {
-      matchedLocalIndices.add(localIdx);
-      updatedLocal[localIdx] = { ...updatedLocal[localIdx], id: cloudEvent.id };
-    } else {
-      trulyNew.push(cloudEvent);
-    }
-  }
-
-  return { entries: [...updatedLocal, ...trulyNew], newCount: trulyNew.length, idUpdates: matchedLocalIndices.size };
-}
-
-/**
  * @template {UsageEvent | RitalinEvent} T
  * @param {T[]} entries
  * @param {string} date
@@ -255,6 +219,39 @@ export function removeEntriesOnDate(entries, date) {
   return {
     kept: entries.filter((e) => e.date !== date),
     removedIds: entries.filter((e) => e.date === date).map((e) => e.id)
+  };
+}
+
+/**
+ * @template {UsageEvent | RitalinEvent} T
+ * @param {T[]} entries
+ * @param {Set<string>} syncedIds
+ * @returns {T[]}
+ */
+export function unsyncedEntries(entries, syncedIds) {
+  return entries.filter((e) => !syncedIds.has(e.id));
+}
+
+/**
+ * Merges cloud events into local ones. The cloud is authoritative for events
+ * already synced, so a synced local event missing from the cloud was deleted
+ * on another device. Local events never uploaded are always kept.
+ *
+ * @template {UsageEvent | RitalinEvent} T
+ * @param {T[]} localEntries
+ * @param {T[]} cloudEntries
+ * @param {Set<string>} syncedIds
+ * @returns {ReconcileResult<T>}
+ */
+export function reconcile(localEntries, cloudEntries, syncedIds) {
+  const cloudIds = new Set(cloudEntries.map((e) => e.id));
+  const localIds = new Set(localEntries.map((e) => e.id));
+  const kept = localEntries.filter((e) => cloudIds.has(e.id) || !syncedIds.has(e.id));
+  const added = cloudEntries.filter((e) => !localIds.has(e.id));
+  return {
+    entries: [...kept, ...added],
+    added: added.length,
+    removed: localEntries.length - kept.length
   };
 }
 

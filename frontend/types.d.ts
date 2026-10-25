@@ -57,11 +57,11 @@ interface WeekEntry {
   aboveGinaThreshold: boolean;
 }
 
-/** Result returned by smartMerge. */
-interface MergeResult<T> {
+/** Result returned by reconcile. */
+interface ReconcileResult<T> {
   entries: T[];
-  newCount: number;
-  idUpdates: number;
+  added: number;
+  removed: number;
 }
 
 /** Result returned by upload API calls. */
