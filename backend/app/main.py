@@ -16,7 +16,7 @@ from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from .migrate import migrate_json_to_sqlite
+from .migrate import migrate_json_to_sqlite, migrate_legacy_token_hashes
 from .repository import CodeRepository, LogRepository
 from .sqlite_storage import SqliteStorage
 
@@ -182,6 +182,7 @@ def create_app(
     # Migrate historical JSON data into SQLite before serving any requests
     if sqlite:
         migrate_json_to_sqlite(app.config["DATA_FILE"], sqlite)
+        migrate_legacy_token_hashes(app.config["DATA_FILE"], sqlite)
 
     # Create repositories for data access
     code_repository = CodeRepository(app.config["DATA_FILE"], sqlite=sqlite)

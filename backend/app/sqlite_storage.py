@@ -267,6 +267,8 @@ class SqliteStorage:
         A token associated with different accounts is an error, never a guess.
         """
         with self._lock, self._conn:
+            # Serialize concurrent worker startups before reading migration state.
+            self._conn.execute("BEGIN IMMEDIATE")
             rows = self._conn.execute(
                 "SELECT code, token, token_generated_at, created_at FROM codes"
             ).fetchall()

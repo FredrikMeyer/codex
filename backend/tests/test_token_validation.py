@@ -8,6 +8,7 @@ The token validation middleware:
 4. Allows request to proceed if token valid
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,24 @@ def test_sqlite_hashed_token_authenticates_after_restart(tmp_path: Path):
             response = client.get("/code", headers={"Authorization": f"Bearer {token}"})
             assert response.status_code == 200
             assert response.get_json()["code"] == code
+
+
+def test_startup_migrates_existing_tokens_without_signing_out(tmp_path: Path):
+    data_file = tmp_path / "data.json"
+    db_file = tmp_path / "data.db"
+    data_file.write_text(json.dumps({"codes": [{
+        "code": "ABC123", "created_at": "2026-01-01", "token": "old-token"
+    }]}))
+
+    for _ in range(2):
+        app = create_app(data_file, db_file)
+        with app.test_client() as client:
+            response = client.get("/code", headers={"Authorization": "Bearer old-token"})
+            assert response.status_code == 200
+            assert response.get_json()["code"] == "ABC123"
+        storage = SqliteStorage(db_file)
+        assert storage.get_code_for_hashed_token("old-token") == "ABC123"
+        storage.close()
 
 
 def test_missing_authorization_header_returns_401(valid_token):
