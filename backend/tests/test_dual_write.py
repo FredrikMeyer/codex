@@ -49,17 +49,17 @@ def test_generate_token_writes_token_to_sqlite(code_repo: CodeRepository, sqlite
     code_repo.create_code("ABC123")
     token = code_repo.generate_token("ABC123")
     assert token is not None
-    assert sqlite.validate_token(token)
+    assert sqlite.get_code_for_hashed_token(token) == "ABC123"
 
 
-def test_generate_token_idempotent_still_syncs_to_sqlite(code_repo: CodeRepository, sqlite: SqliteStorage) -> None:
-    """Second call to generate_token (token already exists) still upserts to SQLite."""
+def test_generate_token_issues_independent_tokens(code_repo: CodeRepository, sqlite: SqliteStorage) -> None:
     code_repo.create_code("ABC123")
     token1 = code_repo.generate_token("ABC123")
     token2 = code_repo.generate_token("ABC123")
-    assert token1 == token2
-    assert token1 is not None
-    assert sqlite.validate_token(token1)
+    assert token1 is not None and token2 is not None
+    assert token1 != token2
+    assert sqlite.get_code_for_hashed_token(token1) == "ABC123"
+    assert sqlite.get_code_for_hashed_token(token2) == "ABC123"
 
 
 def test_repository_accepts_hashed_and_legacy_tokens(code_repo: CodeRepository, sqlite: SqliteStorage) -> None:
@@ -76,8 +76,8 @@ def test_repository_accepts_hashed_and_legacy_tokens(code_repo: CodeRepository, 
 def test_repository_rejects_conflicting_token_ownership(code_repo: CodeRepository, sqlite: SqliteStorage) -> None:
     code_repo.create_code("ABC123")
     code_repo.create_code("OTHER1")
-    legacy = code_repo.generate_token("ABC123")
-    assert legacy is not None
+    legacy = "legacy-token"
+    sqlite.upsert_code({"code": "ABC123", "created_at": "2026-01-01", "token": legacy})
     sqlite.add_hashed_token("OTHER1", legacy, "2026-01-01")
     assert not code_repo.validate_token(legacy)
     assert code_repo.get_code_for_token(legacy) is None

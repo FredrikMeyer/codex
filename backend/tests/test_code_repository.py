@@ -55,11 +55,13 @@ def test_generate_token_returns_a_token_for_valid_code(repo: CodeRepository) -> 
     assert len(token) == 64  # secrets.token_hex(32)
 
 
-def test_generate_token_is_idempotent(repo: CodeRepository) -> None:
+def test_generate_token_issues_independent_tokens(repo: CodeRepository) -> None:
     repo.create_code("ABC123")
     token1 = repo.generate_token("ABC123")
     token2 = repo.generate_token("ABC123")
-    assert token1 == token2
+    assert token1 != token2
+    assert token1 is not None and repo.validate_token(token1)
+    assert token2 is not None and repo.validate_token(token2)
 
 
 def test_two_codes_get_different_tokens(repo: CodeRepository) -> None:

@@ -59,7 +59,7 @@ backend/
 - **POST `/generate-token`** - Exchange a code for a long-lived API token
   - Request: `{"code": "AB12"}`
   - Response: `{"token": "64-char-hex-string"}`
-  - Note: Returns the same token if called multiple times with the same code
+  - With SQLite enabled, each request issues a new token; earlier tokens remain valid. JSON-only mode returns the existing token.
 
 ### Data
 - **POST `/logs`** - Store an asthma log entry (supports dual authentication)

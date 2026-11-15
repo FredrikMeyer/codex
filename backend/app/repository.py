@@ -77,11 +77,18 @@ class CodeRepository:
 
     def generate_token(self, code: str) -> str | None:
         """
-        Return the token for a code, generating one if it does not exist yet.
+        Issue an independent token when SQLite is enabled; otherwise use legacy storage.
 
         Returns:
             The token string, or None if the code does not exist.
         """
+        if self._sqlite:
+            token = secrets.token_hex(32)
+            try:
+                self._sqlite.add_hashed_token(code, token, datetime.now(UTC).isoformat())
+            except ValueError:
+                return None
+            return token
         with self._lock:
             data = load_data(self.data_file)
             for entry in data.get("codes", []):

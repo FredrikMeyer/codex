@@ -9,6 +9,7 @@ The token validation middleware:
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -75,6 +76,54 @@ def test_startup_migrates_existing_tokens_without_signing_out(tmp_path: Path):
         storage = SqliteStorage(db_file)
         assert storage.get_code_for_hashed_token("old-token") == "ABC123"
         storage.close()
+
+
+def test_multiple_devices_survive_restart_and_are_isolated(tmp_path: Path):
+    data_file = tmp_path / "data.json"
+    db_file = tmp_path / "data.db"
+    data_file.write_text(json.dumps({"codes": [
+        {"code": "ABC123", "created_at": "2026-01-01", "token": "old-token"},
+        {"code": "OTHER1", "created_at": "2026-01-01", "token": "other-token"},
+    ]}))
+    app = create_app(data_file, db_file)
+    with app.test_client() as client:
+        tokens = ["old-token"] + [
+            client.post("/generate-token", json={"code": "ABC123"}).get_json()["token"]
+            for _ in range(2)
+        ]
+        assert len(set(tokens)) == 3
+        event = {"id": "private-event", "date": "2026-01-01", "timestamp": "2026-01-01T12:00:00Z", "type": "spray", "count": 1}
+        assert client.post("/events", json={"event": event}, headers={"Authorization": f"Bearer {tokens[0]}"}).status_code == 200
+    app = create_app(data_file, db_file)
+    with app.test_client() as client:
+        for token in tokens:
+            response = client.get("/events", headers={"Authorization": f"Bearer {token}"})
+            assert response.status_code == 200
+            assert any(event["id"] == "private-event" for event in response.get_json()["events"])
+        response = client.get("/events", headers={"Authorization": "Bearer other-token"})
+        assert all(event["id"] != "private-event" for event in response.get_json()["events"])
+    assert all(token not in data_file.read_text() for token in tokens[1:])
+
+
+def test_concurrent_sqlite_token_issuance(tmp_path: Path):
+    data_file = tmp_path / "data.json"
+    db_file = tmp_path / "data.db"
+    app = create_app(data_file, db_file)
+    with app.test_client() as client:
+        code = client.post("/generate-code").get_json()["code"]
+
+    second_worker = create_app(data_file, db_file)
+
+    def issue(worker):
+        with worker.test_client() as client:
+            return client.post("/generate-token", json={"code": code}).get_json()["token"]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        tokens = list(pool.map(issue, (app, second_worker)))
+    assert len(set(tokens)) == 2
+    with app.test_client() as client:
+        for token in tokens:
+            assert client.get("/code", headers={"Authorization": f"Bearer {token}"}).status_code == 200
 
 
 def test_missing_authorization_header_returns_401(valid_token):
