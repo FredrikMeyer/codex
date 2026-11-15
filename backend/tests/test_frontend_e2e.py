@@ -399,8 +399,38 @@ def test_sync_setup_ui_elements_present(page: Page, frontend_url: str):
     expect(page.locator("#sync-configured")).not_to_be_visible()
 
 
+@pytest.mark.parametrize(("status", "expected"), [
+    (200, "Connected"), (401, "Session expired"), (503, "Connection unavailable"),
+    (0, "Connection unavailable"),
+])
+def test_startup_checks_saved_token(page: Page, frontend_url: str, status: int, expected: str):
+    def respond(route):
+        if status == 0:
+            route.abort()
+            return
+        route.fulfill(
+            status=200 if route.request.method == "OPTIONS" else status,
+            json={"code": "ABC123"},
+            headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization"},
+        )
+
+    page.route("**/code", respond)
+    page.goto(frontend_url)
+    page.evaluate("localStorage.setItem('asthma-auth-token', 'saved-token')")
+    page.reload()
+    expect(page.locator("#sync-status-text")).to_have_text(expected if status != 401 else "Session expired — reconnect")
+    assert page.evaluate("localStorage.getItem('asthma-auth-token')") == "saved-token"
+    if status == 401:
+        expect(page.locator("#sync-setup")).to_be_visible()
+
+
 def test_sync_token_storage_in_localstorage(page: Page, frontend_url: str):
     """Test that token storage and retrieval works via localStorage."""
+    page.route("**/code", lambda route: route.fulfill(
+        status=200, json={"code": "ABC123"}, headers={
+            "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization"
+        }
+    ))
     page.goto(frontend_url)
 
     # Clear any existing token

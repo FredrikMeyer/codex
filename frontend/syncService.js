@@ -51,6 +51,30 @@ function updateSyncStatus() {
 }
 
 /** @returns {Promise<void>} */
+async function checkLoginOnStartup() {
+  const token = getToken();
+  if (!token) return;
+  if (syncStatusText) syncStatusText.textContent = 'Checking connection...';
+  try {
+    await apiFetchCode(token);
+    if (getToken() === token) updateSyncStatus();
+  } catch (error) {
+    // A slow response must not overwrite a newer sign-in or disconnect.
+    if (getToken() !== token) return;
+    if (/** @type {{status?: number}} */ (error)?.status === 401) {
+      renderSyncStatus(false, {
+        syncStatusText, syncStatusDot, syncSetupSection, syncConfiguredSection,
+        syncFromCloudBtn, syncToCloudBtn
+      });
+      if (syncStatusText) syncStatusText.textContent = 'Session expired — reconnect';
+    } else if (syncStatusText) {
+      syncStatusText.textContent = 'Connection unavailable';
+      if (syncStatusDot) syncStatusDot.classList.remove('connected');
+    }
+  }
+}
+
+/** @returns {Promise<void>} */
 async function generateCode() {
   try {
     generateCodeBtn.disabled = true;
@@ -360,4 +384,5 @@ export function initSyncService({ getEntries, setEntries, getRitalinEntries, set
   });
 
   updateSyncStatus();
+  void checkLoginOnStartup();
 }
