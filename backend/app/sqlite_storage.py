@@ -4,6 +4,7 @@ SQLite-backed storage for codes, asthma events, and ritalin events.
 Provides thread-safe access to a single SQLite database file.
 """
 
+import hashlib
 import sqlite3
 import threading
 from pathlib import Path
@@ -86,6 +87,14 @@ class SqliteStorage:
                     token              TEXT,
                     token_generated_at TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS auth_tokens (
+                    token_hash TEXT PRIMARY KEY,
+                    code TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_auth_tokens_code ON auth_tokens(code);
 
                 CREATE TABLE IF NOT EXISTS asthma_events (
                     id          TEXT PRIMARY KEY,
@@ -229,6 +238,27 @@ class SqliteStorage:
                 "SELECT 1 FROM codes WHERE token = ?", (token,)
             ).fetchone()
             return row is not None
+
+    def add_hashed_token(self, code: str, token: str, created_at: str) -> None:
+        """Store a token digest for an existing code; never persist the token itself."""
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with self._lock:
+            if not self._conn.execute("SELECT 1 FROM codes WHERE code = ?", (code,)).fetchone():
+                raise ValueError("Unknown code")
+            self._conn.execute(
+                "INSERT INTO auth_tokens (token_hash, code, created_at) VALUES (?, ?, ?)",
+                (digest, code, created_at),
+            )
+            self._conn.commit()
+
+    def get_code_for_hashed_token(self, token: str) -> str | None:
+        """Look up the owner of a token by its digest."""
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT code FROM auth_tokens WHERE token_hash = ?", (digest,)
+            ).fetchone()
+            return row["code"] if row else None
 
     def get_code_for_token(self, token: str) -> str | None:
         """Return the code associated with a token, or None if not found."""

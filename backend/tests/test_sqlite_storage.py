@@ -4,7 +4,9 @@ Tests for SqliteStorage.
 All tests use an in-memory database for speed and isolation.
 """
 
+import sqlite3
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 
@@ -71,6 +73,35 @@ def _ritalin_event(
 
 
 # --- codes ---
+
+def test_hashed_tokens_survive_reopen_and_code_updates(tmp_path: Path) -> None:
+    path = tmp_path / "auth.db"
+    storage = SqliteStorage(path)
+    storage.upsert_code(_code_entry())
+    storage.upsert_code(_code_entry(code="OTHER1"))
+    storage.add_hashed_token("ABC123", "first-secret", "2026-01-01")
+    storage.add_hashed_token("ABC123", "second-secret", "2026-01-02")
+    storage.add_hashed_token("OTHER1", "other-secret", "2026-01-03")
+    storage.upsert_code(_code_entry(last_login_at="2026-01-04"))
+    storage.close()
+
+    with sqlite3.connect(path) as conn:
+        rows = conn.execute("SELECT token_hash FROM auth_tokens").fetchall()
+        assert all("secret" not in row[0] for row in rows)
+
+    storage = SqliteStorage(path)
+    try:
+        assert storage.get_code_for_hashed_token("first-secret") == "ABC123"
+        assert storage.get_code_for_hashed_token("second-secret") == "ABC123"
+        assert storage.get_code_for_hashed_token("other-secret") == "OTHER1"
+        assert storage.get_code_for_hashed_token("unknown") is None
+    finally:
+        storage.close()
+
+
+def test_hashed_token_requires_existing_code(storage: SqliteStorage) -> None:
+    with pytest.raises(ValueError, match="Unknown code"):
+        storage.add_hashed_token("MISSING", "secret", "2026-01-01")
 
 def test_get_codes_returns_empty_initially(storage: SqliteStorage) -> None:
     assert storage.get_codes() == []
