@@ -298,6 +298,22 @@ class SqliteStorage:
                     (digest, code, created_at),
                 )
 
+    def remove_legacy_plaintext_tokens(self) -> None:
+        """Clear SQLite plaintext tokens only after every token has a matching digest."""
+        with self._lock, self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            rows = self._conn.execute(
+                "SELECT code, token FROM codes WHERE token IS NOT NULL AND token != ''"
+            ).fetchall()
+            for row in rows:
+                digest = hashlib.sha256(row["token"].encode("utf-8")).hexdigest()
+                owner = self._conn.execute(
+                    "SELECT code FROM auth_tokens WHERE token_hash = ?", (digest,)
+                ).fetchone()
+                if owner is None or owner["code"] != row["code"]:
+                    raise ValueError("Legacy token has no matching account digest")
+            self._conn.execute("UPDATE codes SET token = NULL WHERE token IS NOT NULL")
+
     def get_code_for_token(self, token: str) -> str | None:
         """Return the code associated with a token, or None if not found."""
         with self._lock:

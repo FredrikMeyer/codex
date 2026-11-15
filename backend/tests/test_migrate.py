@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from app.cleanup_tokens import cleanup_plaintext_tokens
+from app.main import create_app
 from app.migrate import migrate_json_to_sqlite
 from app.sqlite_storage import SqliteStorage
 
@@ -24,6 +26,57 @@ def storage():
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data))
+
+
+def test_cleanup_preserves_existing_sessions_across_restart(tmp_path: Path) -> None:
+    json_path = tmp_path / "storage.json"
+    db_path = tmp_path / "data.db"
+    write_json(json_path, {"codes": [{"code": "ABC123", "created_at": "2024-01-01", "token": "old-secret"}]})
+    app = create_app(json_path, db_path)
+    with app.test_client() as client:
+        fresh = client.post("/generate-token", json={"code": "ABC123"}).get_json()["token"]
+    storage = SqliteStorage(db_path)
+    cleanup_plaintext_tokens(json_path, storage)
+    cleanup_plaintext_tokens(json_path, storage)
+    assert "token" not in json.loads(json_path.read_text())["codes"][0]
+    assert storage.get_codes()[0]["token"] is None
+    storage.close()
+    app = create_app(json_path, db_path)
+    with app.test_client() as client:
+        for token in ("old-secret", fresh):
+            assert client.get("/code", headers={"Authorization": f"Bearer {token}"}).get_json()["code"] == "ABC123"
+        assert client.post("/login", json={"code": "ABC123"}).status_code == 200
+    assert "token" not in json.loads(json_path.read_text())["codes"][0]
+
+
+def test_cleanup_fails_without_modifying_files_if_hash_missing(tmp_path: Path, storage: SqliteStorage) -> None:
+    json_path = tmp_path / "storage.json"
+    write_json(json_path, {"codes": [{"code": "ABC123", "created_at": "2024-01-01", "token": "secret"}]})
+    storage.upsert_code({"code": "ABC123", "created_at": "2024-01-01", "token": "secret"})
+    original = json_path.read_bytes()
+    with pytest.raises(ValueError, match="no matching account digest"):
+        cleanup_plaintext_tokens(json_path, storage)
+    assert json_path.read_bytes() == original
+    assert storage.get_codes()[0]["token"] == "secret"
+
+
+def test_cleanup_can_resume_after_interruption(tmp_path: Path, storage: SqliteStorage, monkeypatch: pytest.MonkeyPatch) -> None:
+    json_path = tmp_path / "storage.json"
+    write_json(json_path, {"codes": [{"code": "ABC123", "created_at": "2024-01-01", "token": "secret"}]})
+    storage.upsert_code({"code": "ABC123", "created_at": "2024-01-01", "token": "secret"})
+    storage.migrate_legacy_tokens([])
+    original = storage.remove_legacy_plaintext_tokens
+
+    def interrupted() -> None:
+        raise OSError("simulated interruption")
+
+    monkeypatch.setattr(storage, "remove_legacy_plaintext_tokens", interrupted)
+    with pytest.raises(OSError, match="simulated interruption"):
+        cleanup_plaintext_tokens(json_path, storage)
+    assert storage.get_code_for_hashed_token("secret") == "ABC123"
+    monkeypatch.setattr(storage, "remove_legacy_plaintext_tokens", original)
+    cleanup_plaintext_tokens(json_path, storage)
+    assert storage.get_codes()[0]["token"] is None
 
 
 # --- no-op cases ---

@@ -127,6 +127,33 @@ def test_migrate_legacy_tokens_rejects_unknown_account(storage: SqliteStorage) -
     with pytest.raises(ValueError, match="unknown SQLite account"):
         storage.migrate_legacy_tokens([_code_entry(token="secret")])
 
+
+def test_remove_legacy_plaintext_tokens_preserves_digest_lookup(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="legacy-token"))
+    storage.migrate_legacy_tokens([])
+    storage.remove_legacy_plaintext_tokens()
+    storage.remove_legacy_plaintext_tokens()
+    assert storage.get_codes()[0]["token"] is None
+    assert storage.get_code_for_hashed_token("legacy-token") == "ABC123"
+
+
+def test_remove_legacy_plaintext_tokens_requires_all_hashes(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="first-token"))
+    storage.upsert_code(_code_entry(code="OTHER1", token="second-token"))
+    storage.add_hashed_token("ABC123", "first-token", "2026-01-01")
+    with pytest.raises(ValueError, match="no matching account digest"):
+        storage.remove_legacy_plaintext_tokens()
+    assert {entry["token"] for entry in storage.get_codes()} == {"first-token", "second-token"}
+
+
+def test_remove_legacy_plaintext_tokens_rejects_wrong_owner(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="legacy-token"))
+    storage.upsert_code(_code_entry(code="OTHER1"))
+    storage.add_hashed_token("OTHER1", "legacy-token", "2026-01-01")
+    with pytest.raises(ValueError, match="no matching account digest"):
+        storage.remove_legacy_plaintext_tokens()
+    assert storage.validate_token("legacy-token")
+
 def test_get_codes_returns_empty_initially(storage: SqliteStorage) -> None:
     assert storage.get_codes() == []
 

@@ -12,3 +12,11 @@ Goal: stop storing bearer tokens in plaintext while keeping existing devices sig
 8. **Improve account recovery separately.** The six-character code can still be exchanged for a token. Design a stronger enrollment and recovery method, migrate users before retiring the old flow, and add revocation and rate limiting appropriate to the deployment.
 
 Until plaintext storage is removed from all active paths, the new table alone does not provide the intended protection against a database or JSON file disclosure.
+
+## Offline plaintext cleanup
+
+`python -m app.cleanup_tokens --json /app/data/storage.json --db /app/data/codex.db --app-stopped` verifies that every plaintext token in both stores has a digest owned by the same account, then clears the JSON and SQLite fields. It can be rerun after an interruption. The flag is an operator assertion, not a lock: stop **all** app workers and other writers before the check and keep them stopped until cleanup completes. Otherwise JSON updates can be lost.
+
+Before running it, make and verify a protected backup of both files, including a consistent SQLite backup. Rehearse on copies using the exact deployment image. Run the command in a separate container with the data volume mounted while the app container is stopped, then restart the app and check existing and new sessions. If it fails, leave the app stopped and investigate or rerun; do not restore a pre-cleanup database over later writes or newly issued tokens. The previous compatible release can read hashed tokens, but may write plaintext credentials again, so recheck both stores after a rollback.
+
+Clearing fields removes values from active records, not necessarily old bytes in SQLite pages, WAL files, snapshots, or backups. Handle those copies according to the deployment's retention and secure disposal policy; this command does not scrub them.
