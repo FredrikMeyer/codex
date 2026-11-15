@@ -260,6 +260,42 @@ class SqliteStorage:
             ).fetchone()
             return row["code"] if row else None
 
+    def migrate_legacy_tokens(self, json_codes: list[CodeEntry]) -> None:
+        """Copy legacy tokens from both stores into digest storage atomically.
+
+        Keep the original values for the compatibility and rollback period.
+        A token associated with different accounts is an error, never a guess.
+        """
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT code, token, token_generated_at, created_at FROM codes"
+            ).fetchall()
+            known_codes = {row["code"] for row in rows}
+            candidates = [
+                (row["code"], row["token"], row["token_generated_at"] or row["created_at"])
+                for row in rows if row["token"]
+            ]
+            for entry in json_codes:
+                token = entry.get("token")
+                if token:
+                    if entry["code"] not in known_codes:
+                        raise ValueError("JSON token belongs to an unknown SQLite account")
+                    candidates.append((
+                        entry["code"], token,
+                        entry.get("token_generated_at") or entry["created_at"],
+                    ))
+            for code, token, created_at in candidates:
+                digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+                existing = self._conn.execute(
+                    "SELECT code FROM auth_tokens WHERE token_hash = ?", (digest,)
+                ).fetchone()
+                if existing and existing["code"] != code:
+                    raise ValueError("Legacy token belongs to multiple accounts")
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO auth_tokens (token_hash, code, created_at) VALUES (?, ?, ?)",
+                    (digest, code, created_at),
+                )
+
     def get_code_for_token(self, token: str) -> str | None:
         """Return the code associated with a token, or None if not found."""
         with self._lock:

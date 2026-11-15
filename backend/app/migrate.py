@@ -18,6 +18,24 @@ from .sqlite_storage import (
 )
 
 
+def migrate_legacy_token_hashes(json_path: Path, storage: SqliteStorage) -> None:
+    """Copy legacy tokens from JSON and SQLite without deleting either copy."""
+    entries: list[CodeEntry] = []
+    if json_path.exists():
+        with json_path.open() as fp:
+            data: dict[str, Any] = json.load(fp)
+        entries = [
+            CodeEntry(
+                code=entry["code"],
+                created_at=entry["created_at"],
+                token=entry.get("token"),
+                token_generated_at=entry.get("token_generated_at"),
+            )
+            for entry in data.get("codes", [])
+        ]
+    storage.migrate_legacy_tokens(entries)
+
+
 def migrate_json_to_sqlite(json_path: Path, storage: SqliteStorage) -> None:
     """
     Migrate all data from the JSON file into SQLite.

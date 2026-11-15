@@ -103,6 +103,30 @@ def test_hashed_token_requires_existing_code(storage: SqliteStorage) -> None:
     with pytest.raises(ValueError, match="Unknown code"):
         storage.add_hashed_token("MISSING", "secret", "2026-01-01")
 
+
+def test_migrate_legacy_tokens_preserves_both_stores_and_is_repeatable(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="sqlite-token"))
+    json_codes = [_code_entry(token="json-token")]
+    storage.migrate_legacy_tokens(json_codes)
+    storage.migrate_legacy_tokens(json_codes)
+    assert storage.get_code_for_hashed_token("sqlite-token") == "ABC123"
+    assert storage.get_code_for_hashed_token("json-token") == "ABC123"
+    assert storage.validate_token("sqlite-token")
+
+
+def test_migrate_legacy_tokens_rolls_back_on_conflict(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry(token="first-token"))
+    storage.upsert_code(_code_entry(code="OTHER1", token="shared-token"))
+    with pytest.raises(ValueError, match="multiple accounts"):
+        storage.migrate_legacy_tokens([_code_entry(token="shared-token")])
+    assert storage.get_code_for_hashed_token("first-token") is None
+    assert storage.get_code_for_hashed_token("shared-token") is None
+
+
+def test_migrate_legacy_tokens_rejects_unknown_account(storage: SqliteStorage) -> None:
+    with pytest.raises(ValueError, match="unknown SQLite account"):
+        storage.migrate_legacy_tokens([_code_entry(token="secret")])
+
 def test_get_codes_returns_empty_initially(storage: SqliteStorage) -> None:
     assert storage.get_codes() == []
 
