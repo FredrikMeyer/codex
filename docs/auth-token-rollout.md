@@ -8,10 +8,10 @@ Goal: stop storing bearer tokens in plaintext while keeping existing devices sig
 4. **Test the complete transition.** Use copies of representative data to test existing and offline devices, multiple devices per account, new sign-ins, account isolation, both event types, restarts, and concurrent requests. Verify new tokens are stored only as digests in every active storage path. Test upgrading an existing SQLite schema and running the migration twice.
 5. **Prepare deployment and rollback.** Take a protected, restorable backup and verify it. Prevent old and new application versions from concurrently issuing tokens with incompatible storage rules. Define and rehearse a rollback that preserves tokens issued after migration; restoring an old backup alone would invalidate those sessions. Test on a production-data copy before deployment.
 6. **Deploy and verify.** Run the migration and release in the tested order. Confirm existing devices can sync and a newly connected device does not disconnect them. Monitor authentication failures without recording credentials.
-7. **Remove legacy plaintext storage.** Once verification and the rollback window are complete, remove plaintext token fields from active JSON and SQLite storage and prevent old migration or dual-write paths from restoring them. Account for SQLite WAL, backups, and other retained copies under the deployment's retention policy.
-8. **Improve account recovery separately.** The six-character code can still be exchanged for a token. Design a stronger enrollment and recovery method, migrate users before retiring the old flow, and add revocation and rate limiting appropriate to the deployment.
+7. **Remove legacy plaintext storage (production cleanup completed).** Active JSON and SQLite fields were cleared and existing sessions verified. Old releases can still write plaintext; account for rollback, SQLite WAL, backups, and other retained copies under the deployment's retention policy.
+8. **Improve account recovery separately (started).** New six-character codes now use a cryptographically secure generator. The code can still be exchanged for a token and remains too short for strong recovery. Design a stronger enrollment and recovery method, migrate users before retiring the old flow, and add revocation and rate limiting appropriate to the deployment.
 
-Until plaintext storage is removed from all active paths, the new table alone does not provide the intended protection against a database or JSON file disclosure.
+JSON-only mode and older releases can still store plaintext tokens; the production SQLite-backed issuance path stores new tokens as hashes.
 
 ## Offline plaintext cleanup
 

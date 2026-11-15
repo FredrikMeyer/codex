@@ -1,6 +1,6 @@
 import logging
 import os
-import random
+import secrets
 import string
 from collections.abc import Callable
 from datetime import date, datetime
@@ -96,7 +96,7 @@ def _event_validation_error_response(
 
 
 def _generate_code() -> str:
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
 
 
 def create_app(
