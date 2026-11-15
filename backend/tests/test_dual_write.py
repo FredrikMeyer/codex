@@ -62,6 +62,27 @@ def test_generate_token_idempotent_still_syncs_to_sqlite(code_repo: CodeReposito
     assert sqlite.validate_token(token1)
 
 
+def test_repository_accepts_hashed_and_legacy_tokens(code_repo: CodeRepository, sqlite: SqliteStorage) -> None:
+    code_repo.create_code("ABC123")
+    legacy = code_repo.generate_token("ABC123")
+    assert legacy is not None
+    sqlite.add_hashed_token("ABC123", "new-device-token", "2026-01-01")
+    for token in (legacy, "new-device-token"):
+        assert code_repo.validate_token(token)
+        assert code_repo.get_code_for_token(token) == "ABC123"
+    assert not code_repo.validate_token("unknown")
+
+
+def test_repository_rejects_conflicting_token_ownership(code_repo: CodeRepository, sqlite: SqliteStorage) -> None:
+    code_repo.create_code("ABC123")
+    code_repo.create_code("OTHER1")
+    legacy = code_repo.generate_token("ABC123")
+    assert legacy is not None
+    sqlite.add_hashed_token("OTHER1", legacy, "2026-01-01")
+    assert not code_repo.validate_token(legacy)
+    assert code_repo.get_code_for_token(legacy) is None
+
+
 # --- LogRepository dual-write ---
 
 def _asthma_event(id: str = "evt-1") -> dict:

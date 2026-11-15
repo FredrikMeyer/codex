@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from app.main import create_app
+from app.sqlite_storage import SqliteStorage
 
 
 @pytest.fixture()
@@ -35,6 +36,26 @@ def valid_token(client):
     token = test_client.post("/generate-token", json={"code": code}).get_json()["token"]
 
     return token, test_client
+
+
+def test_sqlite_hashed_token_authenticates_after_restart(tmp_path: Path):
+    data_file = tmp_path / "data.json"
+    db_file = tmp_path / "data.db"
+    app = create_app(data_file, db_file)
+    with app.test_client() as client:
+        code = client.post("/generate-code").get_json()["code"]
+        legacy = client.post("/generate-token", json={"code": code}).get_json()["token"]
+
+    storage = SqliteStorage(db_file)
+    storage.add_hashed_token(code, "device-token", "2026-01-01")
+    storage.close()
+
+    restarted = create_app(data_file, db_file)
+    with restarted.test_client() as client:
+        for token in (legacy, "device-token"):
+            response = client.get("/code", headers={"Authorization": f"Bearer {token}"})
+            assert response.status_code == 200
+            assert response.get_json()["code"] == code
 
 
 def test_missing_authorization_header_returns_401(valid_token):

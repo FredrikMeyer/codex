@@ -103,7 +103,11 @@ class CodeRepository:
             The code string, or None if the token is not recognised.
         """
         if self._sqlite:
-            return self._sqlite.get_code_for_token(token)
+            hashed_code = self._sqlite.get_code_for_hashed_token(token)
+            legacy_code = self._sqlite.get_code_for_token(token)
+            if hashed_code and legacy_code and hashed_code != legacy_code:
+                return None
+            return hashed_code or legacy_code
         with self._lock:
             data = load_data(self.data_file)
             for entry in data.get("codes", []):
@@ -114,7 +118,7 @@ class CodeRepository:
     def validate_token(self, token: str) -> bool:
         """Return True if the token is valid, False otherwise."""
         if self._sqlite:
-            return self._sqlite.validate_token(token)
+            return self.get_code_for_token(token) is not None
         with self._lock:
             data = load_data(self.data_file)
             return any(
