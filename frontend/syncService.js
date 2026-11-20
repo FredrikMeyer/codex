@@ -2,6 +2,7 @@ import { reconcile, unsyncedEntries } from './tracker.js';
 import { saveEntries, saveRitalinEntries, getToken, setToken, clearToken, hasToken, loadAsthmaSyncedIds, saveAsthmaSyncedIds, loadRitalinSyncedIds, saveRitalinSyncedIds } from './storage.js';
 import { apiGenerateCode, apiGenerateToken, apiFetchCode, apiUploadEvents, apiDownloadEvents, apiUploadRitalinEvents, apiDownloadRitalinEvents, apiDeleteEvents, apiDeleteRitalinEvents } from './api.js';
 import { toast, updateSyncStatus as renderSyncStatus } from './ui.js';
+import { passkeysSupported, registerPasskey, signInWithPasskey } from './passkeys.js';
 
 // DOM elements
 const syncStatusText = document.getElementById('sync-status-text');
@@ -17,6 +18,8 @@ const clearLocalDataBtn = /** @type {HTMLButtonElement} */ (document.getElementB
 const tokenInput = /** @type {HTMLInputElement} */ (document.getElementById('token-input'));
 const enterTokenBtn = /** @type {HTMLButtonElement} */ (document.getElementById('enter-token'));
 const showCodeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('show-code'));
+const passkeyRegisterBtn = /** @type {HTMLButtonElement} */ (document.getElementById('passkey-register'));
+const passkeySignInBtn = /** @type {HTMLButtonElement} */ (document.getElementById('passkey-sign-in'));
 const syncFromCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-from-cloud'));
 const syncToCloudBtn = /** @type {HTMLButtonElement} */ (document.getElementById('sync-to-cloud'));
 const syncCollapses = /** @type {NodeListOf<HTMLDetailsElement>} */ (document.querySelectorAll('.sync-collapse'));
@@ -374,6 +377,43 @@ export function initSyncService({ getEntries, setEntries, getRitalinEntries, set
   disconnectBtn.addEventListener('click', disconnectSync);
   clearLocalDataBtn.addEventListener('click', clearLocalData);
   showCodeBtn.addEventListener('click', showCode);
+  const supported = passkeysSupported();
+  passkeyRegisterBtn.disabled = !supported;
+  passkeySignInBtn.disabled = !supported;
+  if (!supported) {
+    passkeyRegisterBtn.title = 'Passkeys are not available on this device.';
+    passkeySignInBtn.title = 'Passkeys are not available on this device.';
+  }
+  passkeyRegisterBtn.addEventListener('click', async () => {
+    const token = getToken();
+    if (!token) return;
+    passkeyRegisterBtn.disabled = true;
+    try {
+      await registerPasskey(token);
+      toast('Passkey set up. Keep your existing sign-in method for recovery.');
+    } catch (error) {
+      toast('Could not set up passkey. Check your connection or try again.');
+      console.error('Passkey registration failed:', error);
+    } finally {
+      passkeyRegisterBtn.disabled = false;
+    }
+  });
+  passkeySignInBtn.addEventListener('click', async () => {
+    const previousToken = getToken();
+    passkeySignInBtn.disabled = true;
+    try {
+      const token = await signInWithPasskey();
+      if (getToken() !== previousToken) return;
+      setToken(token);
+      updateSyncStatus();
+      toast('Cloud sync connected!');
+    } catch (error) {
+      toast('Could not sign in with passkey. Check your connection or try again.');
+      console.error('Passkey sign-in failed:', error);
+    } finally {
+      passkeySignInBtn.disabled = false;
+    }
+  });
   syncFromCloudBtn.addEventListener('click', syncFromCloud);
   syncToCloudBtn.addEventListener('click', syncToCloud);
 

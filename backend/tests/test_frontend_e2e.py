@@ -424,6 +424,61 @@ def test_startup_checks_saved_token(page: Page, frontend_url: str, status: int, 
         expect(page.locator("#sync-setup")).to_be_visible()
 
 
+def test_passkey_register_and_sign_in_in_browser(page: Page, frontend_url: str, tmp_path: Path):
+    from werkzeug.serving import make_server
+
+    app = create_app(tmp_path / "data.json", tmp_path / "data.db")
+    app.config.update(TESTING=True, WEBAUTHN_RP_ID="localhost", WEBAUTHN_ORIGIN=frontend_url)
+    with app.test_client() as client:
+        code = client.post("/generate-code").get_json()["code"]
+        token = client.post("/generate-token", json={"code": code}).get_json()["token"]
+    server = make_server("127.0.0.1", 0, app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        cdp = page.context.new_cdp_session(page)
+        cdp.send("WebAuthn.enable")
+        cdp.send("WebAuthn.addVirtualAuthenticator", {"options": {
+            "protocol": "ctap2", "transport": "internal", "hasResidentKey": True,
+            "hasUserVerification": True, "isUserVerified": True,
+        }})
+        page.add_init_script(f"window.backendUrl = 'http://localhost:{server.port}'")
+        page.goto(frontend_url)
+        page.evaluate("token => localStorage.setItem('asthma-auth-token', token)", token)
+        page.reload()
+        expect(page.locator("#sync-status-text")).to_have_text("Connected")
+        page.locator("#passkey-register").click()
+        expect(page.locator("#toast")).to_contain_text("Passkey set up")
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#disconnect-sync").click()
+        expect(page.locator("#sync-status-text")).to_have_text("Not configured")
+        page.locator("#passkey-sign-in").click()
+        expect(page.locator("#sync-status-text")).to_have_text("Connected")
+        new_token = page.evaluate("localStorage.getItem('asthma-auth-token')")
+        assert new_token and new_token != token
+        with app.test_client() as client:
+            for value in (token, new_token):
+                assert client.get("/code", headers={"Authorization": f"Bearer {value}"}).get_json()["code"] == code
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_cancelled_passkey_sign_in_keeps_local_data(page: Page, frontend_url: str):
+    page.add_init_script("""navigator.credentials.get = () => Promise.reject(new DOMException('Cancelled', 'NotAllowedError'))""")
+    page.route("**/passkeys/login/options", lambda route: route.fulfill(
+        status=200, json={"challenge_id": "id", "options": {"challenge": "AQID", "rpId": "localhost"}},
+        headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type"},
+    ))
+    page.goto(frontend_url)
+    page.evaluate("localStorage.setItem('asthma-usage-entries', '[]')")
+    page.locator("#passkey-sign-in").click()
+    expect(page.locator("#toast")).to_contain_text("Could not sign in")
+    assert page.evaluate("localStorage.getItem('asthma-usage-entries')") == "[]"
+    assert page.evaluate("localStorage.getItem('asthma-auth-token')") is None
+
+
 def test_sync_token_storage_in_localstorage(page: Page, frontend_url: str):
     """Test that token storage and retrieval works via localStorage."""
     page.route("**/code", lambda route: route.fulfill(

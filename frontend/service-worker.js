@@ -1,4 +1,4 @@
-const CACHE = 'asthma-tracker-v37';
+const CACHE = 'asthma-tracker-v38';
 const ASSET_PATHS = [
   '.',
   'index.html',
@@ -12,6 +12,7 @@ const ASSET_PATHS = [
   'ui.js',
   'editDialog.js',
   'syncService.js',
+  'passkeys.js',
   'manifest.webmanifest'
 ];
 const BASE_URL = self.location.href.replace(/service-worker\\.js(?:\\?.*)?$/, '');

@@ -56,6 +56,10 @@
         </summary>
         <div id="sync-setup" class="sync-setup">
           <div class="setup-step">
+            <p class="hint">Sign in with a passkey you've already set up.</p>
+            <button id="passkey-sign-in" class="primary" type="button">Sign in with passkey</button>
+          </div>
+          <div class="setup-step">
             <p class="hint">Option 1: Generate a new code</p>
             <button id="generate-code" class="ghost" type="button">Generate Code</button>
             <div id="generated-code" class="code-display"></div>
@@ -91,6 +95,7 @@
           </summary>
           <p class="hint">Syncs both asthma and Ritalin events across your devices.</p>
           <div class="button-group sync-extras-buttons">
+            <button id="passkey-register" class="ghost" type="button">Set up passkey</button>
             <button id="show-code" class="ghost">Show My Code</button>
             <button id="disconnect-sync" class="ghost">Disconnect</button>
             <button id="clear-local-data" class="ghost danger">Clear local data</button>
