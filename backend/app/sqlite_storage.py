@@ -20,6 +20,21 @@ class CodeEntry(TypedDict):
     token_generated_at: NotRequired[str | None]
 
 
+class PasskeyCredential(TypedDict):
+    credential_id: bytes
+    code: str
+    public_key: bytes
+    sign_count: int
+    created_at: str
+
+
+def _passkey_credential_from_row(row: sqlite3.Row) -> PasskeyCredential:
+    return PasskeyCredential(
+        credential_id=row["credential_id"], code=row["code"], public_key=row["public_key"],
+        sign_count=row["sign_count"], created_at=row["created_at"],
+    )
+
+
 class AsthmaMedicineEventData(TypedDict):
     """Input shape for inserting an asthma event."""
 
@@ -165,6 +180,42 @@ class SqliteStorage:
                 (code, handle),
             )
             return handle
+
+    def add_passkey_credential(self, credential: PasskeyCredential) -> None:
+        """Store a verified credential for an account that has a user handle.
+
+        The caller is responsible for verifying the WebAuthn ceremony. A
+        duplicate credential ID raises IntegrityError rather than changing its owner.
+        """
+        with self._lock, self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            if not self._conn.execute(
+                "SELECT 1 FROM passkey_accounts WHERE code = ?", (credential["code"],)
+            ).fetchone():
+                raise ValueError("Account has no passkey user handle")
+            self._conn.execute(
+                """INSERT INTO passkey_credentials
+                   (credential_id, code, public_key, sign_count, created_at)
+                   VALUES (:credential_id, :code, :public_key, :sign_count, :created_at)""",
+                credential,
+            )
+
+    def get_passkey_credential(self, credential_id: bytes) -> PasskeyCredential | None:
+        """Look up a credential and its owning account by credential ID."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM passkey_credentials WHERE credential_id = ?", (credential_id,)
+            ).fetchone()
+            return _passkey_credential_from_row(row) if row else None
+
+    def list_passkey_credentials(self, code: str) -> list[PasskeyCredential]:
+        """List credentials belonging to one account."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM passkey_credentials WHERE code = ? ORDER BY created_at, credential_id",
+                (code,),
+            ).fetchall()
+            return [_passkey_credential_from_row(row) for row in rows]
 
     def upsert_code(self, entry: CodeEntry) -> None:
         """Insert or replace a code entry."""

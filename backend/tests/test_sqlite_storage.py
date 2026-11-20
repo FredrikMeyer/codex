@@ -14,6 +14,7 @@ import pytest
 from app.sqlite_storage import (
     AsthmaMedicineEventData,
     CodeEntry,
+    PasskeyCredential,
     RitalinEventData,
     SqliteStorage,
 )
@@ -107,6 +108,36 @@ def test_concurrent_workers_create_one_passkey_handle(tmp_path: Path) -> None:
     finally:
         first.close()
         second.close()
+
+
+def test_passkey_credentials_persist_and_are_scoped_to_account(tmp_path: Path) -> None:
+    db = tmp_path / "credentials.db"
+    storage = SqliteStorage(db)
+    storage.upsert_code(_code_entry())
+    storage.upsert_code(_code_entry(code="OTHER1"))
+    storage.get_or_create_passkey_user_handle("ABC123")
+    storage.get_or_create_passkey_user_handle("OTHER1")
+    first = PasskeyCredential(credential_id=b"id-1", code="ABC123", public_key=b"key-1", sign_count=0, created_at="2026-01-01")
+    second = PasskeyCredential(credential_id=b"id-2", code="ABC123", public_key=b"key-2", sign_count=4, created_at="2026-01-02")
+    other = PasskeyCredential(credential_id=b"id-3", code="OTHER1", public_key=b"key-3", sign_count=0, created_at="2026-01-03")
+    for credential in (first, second, other):
+        storage.add_passkey_credential(credential)
+    storage.upsert_code(_code_entry(last_login_at="2026-01-04"))
+    storage.close()
+
+    storage = SqliteStorage(db)
+    try:
+        assert storage.list_passkey_credentials("ABC123") == [first, second]
+        assert storage.list_passkey_credentials("OTHER1") == [other]
+        assert storage.get_passkey_credential(b"id-1") == first
+        assert storage.get_passkey_credential(b"unknown") is None
+        with pytest.raises(sqlite3.IntegrityError):
+            storage.add_passkey_credential({**first, "code": "OTHER1"})
+        assert storage.get_passkey_credential(b"id-1") == first
+        with pytest.raises(ValueError, match="no passkey user handle"):
+            storage.add_passkey_credential({**first, "credential_id": b"new", "code": "UNKNOWN"})
+    finally:
+        storage.close()
 
 def test_hashed_tokens_survive_reopen_and_code_updates(tmp_path: Path) -> None:
     path = tmp_path / "auth.db"
