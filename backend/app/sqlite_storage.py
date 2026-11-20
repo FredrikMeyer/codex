@@ -5,6 +5,7 @@ Provides thread-safe access to a single SQLite database file.
 """
 
 import hashlib
+import secrets
 import sqlite3
 import threading
 from pathlib import Path
@@ -96,6 +97,21 @@ class SqliteStorage:
 
                 CREATE INDEX IF NOT EXISTS idx_auth_tokens_code ON auth_tokens(code);
 
+                CREATE TABLE IF NOT EXISTS passkey_accounts (
+                    code TEXT PRIMARY KEY,
+                    user_handle BLOB NOT NULL UNIQUE
+                );
+
+                CREATE TABLE IF NOT EXISTS passkey_credentials (
+                    credential_id BLOB PRIMARY KEY,
+                    code TEXT NOT NULL,
+                    public_key BLOB NOT NULL,
+                    sign_count INTEGER NOT NULL CHECK(sign_count >= 0),
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_passkey_credentials_code ON passkey_credentials(code);
+
                 CREATE TABLE IF NOT EXISTS asthma_events (
                     id          TEXT PRIMARY KEY,
                     code        TEXT NOT NULL,
@@ -131,6 +147,24 @@ class SqliteStorage:
                 )
                 for row in rows
             ]
+
+    def get_or_create_passkey_user_handle(self, code: str) -> bytes:
+        """Return a stable opaque handle for an existing account across workers."""
+        with self._lock, self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            if not self._conn.execute("SELECT 1 FROM codes WHERE code = ?", (code,)).fetchone():
+                raise ValueError("Unknown code")
+            row = self._conn.execute(
+                "SELECT user_handle FROM passkey_accounts WHERE code = ?", (code,)
+            ).fetchone()
+            if row:
+                return bytes(row["user_handle"])
+            handle = secrets.token_bytes(32)
+            self._conn.execute(
+                "INSERT INTO passkey_accounts (code, user_handle) VALUES (?, ?)",
+                (code, handle),
+            )
+            return handle
 
     def upsert_code(self, entry: CodeEntry) -> None:
         """Insert or replace a code entry."""

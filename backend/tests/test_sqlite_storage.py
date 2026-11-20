@@ -6,6 +6,7 @@ All tests use an in-memory database for speed and isolation.
 
 import sqlite3
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -73,6 +74,39 @@ def _ritalin_event(
 
 
 # --- codes ---
+
+def test_passkey_handle_survives_account_updates_and_restart(tmp_path: Path) -> None:
+    db = tmp_path / "storage.db"
+    storage = SqliteStorage(db)
+    storage.upsert_code(_code_entry())
+    handle = storage.get_or_create_passkey_user_handle("ABC123")
+    assert len(handle) == 32
+    assert handle != b"ABC123"
+    storage.upsert_code(_code_entry(last_login_at="2026-01-02"))
+    storage.close()
+    storage = SqliteStorage(db)
+    try:
+        assert storage.get_or_create_passkey_user_handle("ABC123") == handle
+        storage.upsert_code(_code_entry(code="OTHER1"))
+        assert storage.get_or_create_passkey_user_handle("OTHER1") != handle
+        with pytest.raises(ValueError, match="Unknown code"):
+            storage.get_or_create_passkey_user_handle("MISSING")
+    finally:
+        storage.close()
+
+
+def test_concurrent_workers_create_one_passkey_handle(tmp_path: Path) -> None:
+    db = tmp_path / "storage.db"
+    first = SqliteStorage(db)
+    first.upsert_code(_code_entry())
+    second = SqliteStorage(db)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            handles = list(pool.map(lambda storage: storage.get_or_create_passkey_user_handle("ABC123"), (first, second)))
+        assert handles[0] == handles[1]
+    finally:
+        first.close()
+        second.close()
 
 def test_hashed_tokens_survive_reopen_and_code_updates(tmp_path: Path) -> None:
     path = tmp_path / "auth.db"
