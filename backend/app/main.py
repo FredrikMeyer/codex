@@ -17,11 +17,17 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from webauthn import (
+    generate_authentication_options,
     generate_registration_options,
     options_to_json,
+    verify_authentication_response,
     verify_registration_response,
 )
-from webauthn.helpers import bytes_to_base64url, parse_registration_credential_json
+from webauthn.helpers import (
+    bytes_to_base64url,
+    parse_authentication_credential_json,
+    parse_registration_credential_json,
+)
 from webauthn.helpers.exceptions import WebAuthnException
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
@@ -301,6 +307,56 @@ def create_app(
         except sqlite3.IntegrityError:
             return jsonify({"error": "Passkey already registered"}), 409
         return jsonify({"status": "registered"}), 201
+
+    @app.post("/passkeys/login/options")
+    @limiter.limit("10 per minute")
+    def passkey_login_options() -> Any:
+        if sqlite is None:
+            return jsonify({"error": "Passkeys require SQLite storage"}), 503
+        challenge_id, challenge = sqlite.create_passkey_challenge("authentication")
+        options = generate_authentication_options(
+            rp_id=app.config["WEBAUTHN_RP_ID"], challenge=challenge,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        )
+        return jsonify({"challenge_id": challenge_id, "options": json.loads(options_to_json(options))})
+
+    @app.post("/passkeys/login/verify")
+    @limiter.limit("10 per minute")
+    def passkey_login_verify() -> Any:
+        if sqlite is None:
+            return jsonify({"error": "Passkeys require SQLite storage"}), 503
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("challenge_id"), str) or not isinstance(payload.get("credential"), dict):
+            return jsonify({"error": "Challenge ID and credential are required"}), 400
+        challenge = sqlite.consume_passkey_challenge(payload["challenge_id"], "authentication")
+        if challenge is None:
+            return jsonify({"error": "Invalid or expired challenge"}), 400
+        try:
+            credential = parse_authentication_credential_json(payload["credential"])
+            stored = sqlite.get_passkey_credential(credential.raw_id)
+            if stored is None:
+                return jsonify({"error": "Invalid passkey authentication"}), 401
+            handle = sqlite.get_passkey_user_handle(stored["code"])
+            if handle is None or credential.response.user_handle != handle:
+                return jsonify({"error": "Invalid passkey authentication"}), 401
+            result = verify_authentication_response(
+                credential=credential, expected_challenge=challenge,
+                expected_rp_id=app.config["WEBAUTHN_RP_ID"], expected_origin=app.config["WEBAUTHN_ORIGIN"],
+                credential_public_key=stored["public_key"], credential_current_sign_count=stored["sign_count"],
+                require_user_verification=True,
+            )
+            if stored.get("device_type") is not None and stored["device_type"] != result.credential_device_type.value:
+                return jsonify({"error": "Invalid passkey authentication"}), 401
+        except (WebAuthnException, ValueError, TypeError, KeyError):
+            return jsonify({"error": "Invalid passkey authentication"}), 401
+        if not sqlite.update_passkey_after_authentication(
+            result.credential_id, stored["sign_count"], result.new_sign_count, result.credential_backed_up,
+        ):
+            return jsonify({"error": "Authentication state changed; try again"}), 409
+        token = code_repository.generate_token(stored["code"])
+        if token is None:
+            return jsonify({"error": "Invalid passkey authentication"}), 401
+        return jsonify({"token": token})
 
     @app.post("/generate-code")
     @limiter.limit("5 per hour")

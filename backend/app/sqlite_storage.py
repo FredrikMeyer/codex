@@ -212,6 +212,14 @@ class SqliteStorage:
             )
             return handle
 
+    def get_passkey_user_handle(self, code: str) -> bytes | None:
+        """Return the account's existing WebAuthn user handle, if any."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT user_handle FROM passkey_accounts WHERE code = ?", (code,)
+            ).fetchone()
+            return bytes(row["user_handle"]) if row else None
+
     def create_passkey_challenge(
         self, ceremony: Literal["registration", "authentication"], code: str | None = None,
     ) -> tuple[str, bytes]:
