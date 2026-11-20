@@ -76,6 +76,47 @@ def _ritalin_event(
 
 # --- codes ---
 
+def test_passkey_challenges_are_bound_and_single_use(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry())
+    challenge_id, challenge = storage.create_passkey_challenge("registration", "ABC123")
+    assert len(challenge) == 32
+    assert storage.consume_passkey_challenge(challenge_id, "registration", "OTHER1") is None
+    assert storage.consume_passkey_challenge(challenge_id, "authentication") is None
+    assert storage.consume_passkey_challenge(challenge_id, "registration", "ABC123") == challenge
+    assert storage.consume_passkey_challenge(challenge_id, "registration", "ABC123") is None
+    auth_id, auth_challenge = storage.create_passkey_challenge("authentication")
+    assert storage.consume_passkey_challenge(auth_id, "authentication") == auth_challenge
+    with pytest.raises(ValueError):
+        storage.create_passkey_challenge("registration")
+    with pytest.raises(ValueError):
+        storage.create_passkey_challenge("authentication", "ABC123")
+    with pytest.raises(ValueError, match="Unknown code"):
+        storage.create_passkey_challenge("registration", "MISSING")
+
+
+def test_passkey_challenge_expires_at_deadline(storage: SqliteStorage, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.sqlite_storage.time.time", lambda: 1000)
+    challenge_id, _ = storage.create_passkey_challenge("authentication")
+    monkeypatch.setattr("app.sqlite_storage.time.time", lambda: 1300)
+    assert storage.consume_passkey_challenge(challenge_id, "authentication") is None
+
+
+def test_passkey_challenge_consumed_once_across_workers(tmp_path: Path) -> None:
+    db = tmp_path / "challenge.db"
+    first = SqliteStorage(db)
+    challenge_id, challenge = first.create_passkey_challenge("authentication")
+    first.close()
+    first = SqliteStorage(db)
+    second = SqliteStorage(db)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda worker: worker.consume_passkey_challenge(challenge_id, "authentication"), (first, second)))
+        assert results.count(challenge) == 1
+        assert results.count(None) == 1
+    finally:
+        first.close()
+        second.close()
+
 def test_passkey_handle_survives_account_updates_and_restart(tmp_path: Path) -> None:
     db = tmp_path / "storage.db"
     storage = SqliteStorage(db)

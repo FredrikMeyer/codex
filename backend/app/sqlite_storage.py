@@ -9,8 +9,9 @@ import json
 import secrets
 import sqlite3
 import threading
+import time
 from pathlib import Path
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class CodeEntry(TypedDict):
@@ -138,6 +139,18 @@ class SqliteStorage:
 
                 CREATE INDEX IF NOT EXISTS idx_passkey_credentials_code ON passkey_credentials(code);
 
+                CREATE TABLE IF NOT EXISTS passkey_challenges (
+                    challenge_id TEXT PRIMARY KEY,
+                    challenge BLOB NOT NULL,
+                    ceremony TEXT NOT NULL CHECK(ceremony IN ('registration', 'authentication')),
+                    code TEXT,
+                    expires_at INTEGER NOT NULL,
+                    CHECK((ceremony = 'registration' AND code IS NOT NULL) OR
+                          (ceremony = 'authentication' AND code IS NULL))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_passkey_challenges_expiry ON passkey_challenges(expires_at);
+
                 CREATE TABLE IF NOT EXISTS asthma_events (
                     id          TEXT PRIMARY KEY,
                     code        TEXT NOT NULL,
@@ -198,6 +211,41 @@ class SqliteStorage:
                 (code, handle),
             )
             return handle
+
+    def create_passkey_challenge(
+        self, ceremony: Literal["registration", "authentication"], code: str | None = None,
+    ) -> tuple[str, bytes]:
+        """Create a five-minute challenge, binding registration to an account."""
+        if (ceremony == "registration" and not code) or (ceremony == "authentication" and code is not None):
+            raise ValueError("Invalid challenge account binding")
+        if ceremony not in ("registration", "authentication"):
+            raise ValueError("Invalid ceremony")
+        challenge_id = secrets.token_urlsafe(32)
+        challenge = secrets.token_bytes(32)
+        with self._lock, self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            now = int(time.time())
+            if code and not self._conn.execute("SELECT 1 FROM codes WHERE code = ?", (code,)).fetchone():
+                raise ValueError("Unknown code")
+            self._conn.execute("DELETE FROM passkey_challenges WHERE expires_at <= ?", (now,))
+            self._conn.execute(
+                "INSERT INTO passkey_challenges VALUES (?, ?, ?, ?, ?)",
+                (challenge_id, challenge, ceremony, code, now + 300),
+            )
+        return challenge_id, challenge
+
+    def consume_passkey_challenge(
+        self, challenge_id: str, ceremony: Literal["registration", "authentication"], code: str | None = None,
+    ) -> bytes | None:
+        """Consume one unexpired matching challenge atomically across workers."""
+        with self._lock, self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            now = int(time.time())
+            row = self._conn.execute(
+                "DELETE FROM passkey_challenges WHERE challenge_id = ? AND ceremony = ? AND code IS ? AND expires_at > ? RETURNING challenge",
+                (challenge_id, ceremony, code, now),
+            ).fetchone()
+            return bytes(row["challenge"]) if row else None
 
     def add_passkey_credential(self, credential: PasskeyCredential) -> None:
         """Store a verified credential for an account that has a user handle.
