@@ -139,6 +139,40 @@ def test_passkey_credentials_persist_and_are_scoped_to_account(tmp_path: Path) -
     finally:
         storage.close()
 
+
+def test_passkey_metadata_and_counter_updates(storage: SqliteStorage) -> None:
+    storage.upsert_code(_code_entry())
+    storage.get_or_create_passkey_user_handle("ABC123")
+    credential = PasskeyCredential(
+        credential_id=b"id", code="ABC123", public_key=b"key", sign_count=3,
+        created_at="2026-01-01", device_type="multi_device", backed_up=False,
+        transports=["internal", "hybrid"],
+    )
+    storage.add_passkey_credential(credential)
+    assert storage.get_passkey_credential(b"id") == credential
+    assert storage.update_passkey_after_authentication(b"id", 3, 4, True)
+    assert not storage.update_passkey_after_authentication(b"id", 3, 5, False)
+    updated = storage.get_passkey_credential(b"id")
+    assert updated is not None and updated["sign_count"] == 4 and updated["backed_up"] is True
+    with pytest.raises(ValueError, match="counter"):
+        storage.update_passkey_after_authentication(b"id", 4, 4, False)
+
+
+def test_passkey_upgrade_preserves_existing_credential(tmp_path: Path) -> None:
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE passkey_credentials (credential_id BLOB PRIMARY KEY, code TEXT NOT NULL, public_key BLOB NOT NULL, sign_count INTEGER NOT NULL, created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO passkey_credentials VALUES (?, ?, ?, ?, ?)", (b"id", "ABC123", b"key", 0, "2026-01-01"))
+    storage = SqliteStorage(path)
+    try:
+        assert storage.get_passkey_credential(b"id") == {
+            "credential_id": b"id", "code": "ABC123", "public_key": b"key",
+            "sign_count": 0, "created_at": "2026-01-01",
+        }
+        assert storage.update_passkey_after_authentication(b"id", 0, 0, False)
+    finally:
+        storage.close()
+
 def test_hashed_tokens_survive_reopen_and_code_updates(tmp_path: Path) -> None:
     path = tmp_path / "auth.db"
     storage = SqliteStorage(path)

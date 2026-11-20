@@ -5,6 +5,7 @@ Provides thread-safe access to a single SQLite database file.
 """
 
 import hashlib
+import json
 import secrets
 import sqlite3
 import threading
@@ -26,13 +27,23 @@ class PasskeyCredential(TypedDict):
     public_key: bytes
     sign_count: int
     created_at: str
+    device_type: NotRequired[str | None]
+    backed_up: NotRequired[bool | None]
+    transports: NotRequired[list[str] | None]
 
 
 def _passkey_credential_from_row(row: sqlite3.Row) -> PasskeyCredential:
-    return PasskeyCredential(
+    credential = PasskeyCredential(
         credential_id=row["credential_id"], code=row["code"], public_key=row["public_key"],
         sign_count=row["sign_count"], created_at=row["created_at"],
     )
+    if row["device_type"] is not None:
+        credential["device_type"] = row["device_type"]
+    if row["backed_up"] is not None:
+        credential["backed_up"] = bool(row["backed_up"])
+    if row["transports"] is not None:
+        credential["transports"] = json.loads(row["transports"])
+    return credential
 
 
 class AsthmaMedicineEventData(TypedDict):
@@ -147,6 +158,13 @@ class SqliteStorage:
                     received_at TEXT NOT NULL
                 );
             """)
+            # Serialize schema upgrades across application workers.
+            with self._conn:
+                self._conn.execute("BEGIN IMMEDIATE")
+                columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(passkey_credentials)")}
+                for name, sql_type in (("device_type", "TEXT"), ("backed_up", "INTEGER"), ("transports", "TEXT")):
+                    if name not in columns:
+                        self._conn.execute(f"ALTER TABLE passkey_credentials ADD COLUMN {name} {sql_type}")
 
     def get_codes(self) -> list[CodeEntry]:
         """Return all code entries."""
@@ -195,10 +213,25 @@ class SqliteStorage:
                 raise ValueError("Account has no passkey user handle")
             self._conn.execute(
                 """INSERT INTO passkey_credentials
-                   (credential_id, code, public_key, sign_count, created_at)
-                   VALUES (:credential_id, :code, :public_key, :sign_count, :created_at)""",
-                credential,
+                   (credential_id, code, public_key, sign_count, created_at, device_type, backed_up, transports)
+                   VALUES (:credential_id, :code, :public_key, :sign_count, :created_at, :device_type, :backed_up, :transports)""",
+                {**credential, "device_type": credential.get("device_type"),
+                 "backed_up": credential.get("backed_up"),
+                 "transports": json.dumps(credential["transports"]) if credential.get("transports") is not None else None},
             )
+
+    def update_passkey_after_authentication(
+        self, credential_id: bytes, expected_count: int, new_count: int, backed_up: bool
+    ) -> bool:
+        """Atomically save verifier output if the stored counter is still current."""
+        if new_count < 0 or (expected_count != 0 or new_count != 0) and new_count <= expected_count:
+            raise ValueError("Invalid signature counter")
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE passkey_credentials SET sign_count = ?, backed_up = ? WHERE credential_id = ? AND sign_count = ?",
+                (new_count, backed_up, credential_id, expected_count),
+            )
+            return cursor.rowcount == 1
 
     def get_passkey_credential(self, credential_id: bytes) -> PasskeyCredential | None:
         """Look up a credential and its owning account by credential ID."""
