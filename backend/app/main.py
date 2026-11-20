@@ -1,9 +1,11 @@
+import json
 import logging
 import os
 import secrets
+import sqlite3
 import string
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from functools import wraps
 from pathlib import Path
 from typing import Any, cast
@@ -14,11 +16,24 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from webauthn import (
+    generate_registration_options,
+    options_to_json,
+    verify_registration_response,
+)
+from webauthn.helpers import bytes_to_base64url, parse_registration_credential_json
+from webauthn.helpers.exceptions import WebAuthnException
+from webauthn.helpers.structs import (
+    AuthenticatorSelectionCriteria,
+    PublicKeyCredentialDescriptor,
+    ResidentKeyRequirement,
+    UserVerificationRequirement,
+)
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .migrate import migrate_json_to_sqlite, migrate_legacy_token_hashes
 from .repository import CodeRepository, LogRepository
-from .sqlite_storage import SqliteStorage
+from .sqlite_storage import PasskeyCredential, SqliteStorage
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +134,8 @@ def create_app(
     # Configure production mode
     production_value = os.environ.get("PRODUCTION", "false").lower()
     app.config["PRODUCTION"] = production_value in ("true", "1")
+    app.config["WEBAUTHN_RP_ID"] = os.environ.get("WEBAUTHN_RP_ID", "fredrikmeyer.net")
+    app.config["WEBAUTHN_ORIGIN"] = os.environ.get("WEBAUTHN_ORIGIN", "https://fredrikmeyer.net")
 
     # Configure CORS
     allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
@@ -224,6 +241,66 @@ def create_app(
             return decorated_function
 
         return decorator
+
+    @app.post("/passkeys/register/options")
+    @limiter.limit("10 per minute")
+    @require_auth()
+    def passkey_registration_options() -> Any:
+        if sqlite is None:
+            return jsonify({"error": "Passkeys require SQLite storage"}), 503
+        token = request.headers["Authorization"].split()[1]
+        code = code_repository.get_code_for_token(token)
+        if code is None:
+            return jsonify({"error": "Invalid token"}), 401
+        handle = sqlite.get_or_create_passkey_user_handle(code)
+        challenge_id, challenge = sqlite.create_passkey_challenge("registration", code)
+        options = generate_registration_options(
+            rp_id=app.config["WEBAUTHN_RP_ID"], rp_name="Medicine Tracker",
+            user_name=bytes_to_base64url(handle), user_display_name="Medicine Tracker account",
+            user_id=handle, challenge=challenge,
+            authenticator_selection=AuthenticatorSelectionCriteria(
+                resident_key=ResidentKeyRequirement.REQUIRED,
+                user_verification=UserVerificationRequirement.REQUIRED,
+            ),
+            exclude_credentials=[PublicKeyCredentialDescriptor(id=entry["credential_id"]) for entry in sqlite.list_passkey_credentials(code)],
+        )
+        return jsonify({"challenge_id": challenge_id, "options": json.loads(options_to_json(options))})
+
+    @app.post("/passkeys/register/verify")
+    @limiter.limit("10 per minute")
+    @require_auth()
+    def passkey_registration_verify() -> Any:
+        if sqlite is None:
+            return jsonify({"error": "Passkeys require SQLite storage"}), 503
+        code = code_repository.get_code_for_token(request.headers["Authorization"].split()[1])
+        if code is None:
+            return jsonify({"error": "Invalid token"}), 401
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("challenge_id"), str) or not isinstance(payload.get("credential"), dict):
+            return jsonify({"error": "Challenge ID and credential are required"}), 400
+        challenge = sqlite.consume_passkey_challenge(payload["challenge_id"], "registration", code)
+        if challenge is None:
+            return jsonify({"error": "Invalid or expired challenge"}), 400
+        try:
+            credential = parse_registration_credential_json(payload["credential"])
+            result = verify_registration_response(
+                credential=credential, expected_challenge=challenge,
+                expected_rp_id=app.config["WEBAUTHN_RP_ID"], expected_origin=app.config["WEBAUTHN_ORIGIN"],
+                require_user_verification=True,
+            )
+        except (WebAuthnException, ValueError, TypeError, KeyError):
+            return jsonify({"error": "Invalid passkey registration"}), 400
+        transports = credential.response.transports
+        try:
+            sqlite.add_passkey_credential(PasskeyCredential(
+                credential_id=result.credential_id, code=code, public_key=result.credential_public_key,
+                sign_count=result.sign_count, created_at=datetime.now(UTC).isoformat(),
+                device_type=result.credential_device_type.value, backed_up=result.credential_backed_up,
+                transports=[transport.value for transport in transports] if transports is not None else None,
+            ))
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Passkey already registered"}), 409
+        return jsonify({"status": "registered"}), 201
 
     @app.post("/generate-code")
     @limiter.limit("5 per hour")
